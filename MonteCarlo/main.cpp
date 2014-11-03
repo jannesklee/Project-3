@@ -19,7 +19,7 @@ ofstream ofile;
 // declaration of functions
 
 // The Mc sampling for the variational Monte Carlo
-void  mc_sampling(int, int, int, int, int, int, double, double *, double *);
+void  mc_sampling(int, int, int, int, int, int, double, vec &, vec &);
 
 // The variational wave function
 double  wave_function(mat, double, int, int);
@@ -28,7 +28,7 @@ double  wave_function(mat, double, int, int);
 double  local_energy(mat, double, double, int, int, int);
 
 // prints to screen the results of the calculations
-void  output(int, int, int, double *, double *);
+void  output(int, int, int, vec, vec);
 
 // pseudo-random numbers generator
 double ran1(long *);
@@ -37,39 +37,37 @@ double ran1(long *);
 
 int main()
 {
-  int number_cycles = 10000;                                           //number of Monte-Carlo steps   //
-  int max_variations = 200;                                            //maximum variational parameters//
-  int thermalization = 1000;                                            //number of Thermalization steps//
-  int charge = 1;                                                    //nucleus' charge               //
-  int dimension = 2;                                                 //dimensionality                //
-  int number_particles = 2;                                          //number of particles           //
-  double step_length= 0.0001;                                              //step length                   //
+  int number_cycles = 1000000;                                          //number of Monte-Carlo steps   //
+  int max_variations = 20;                                            //maximum variational parameters//
+  int thermalization = 10000;                                           //number of Thermalization steps//
+  int charge = 1;                                                      //nucleus' charge               //
+  int dimension = 2;                                                   //dimensionality                //
+  int number_particles = 2;                                            //number of particles           //
+  double step_length= 1.0;                                          //step length                   //
 
-  double *cumulative_e;
-  double *cumulative_e2;
+  vec cumulative_e;
+  vec cumulative_e2;
 
+  cumulative_e = vec(max_variations+1);
+  cumulative_e2 = vec(max_variations+1);
 
-  cumulative_e = new double[max_variations+1];
-  cumulative_e2 = new double[max_variations+1];
-
+  ofile.open("vmc.dat");
   //  Do the mc sampling
   mc_sampling(dimension, number_particles, charge,
               max_variations, thermalization,
           number_cycles, step_length, cumulative_e, cumulative_e2);
   // Print out results
   output(max_variations, number_cycles, charge, cumulative_e, cumulative_e2);
-  delete [] cumulative_e; delete [] cumulative_e2;
   ofile.close();  // close output file
   return 0;
 }
 
 
 // Monte Carlo sampling with the Metropolis algorithm
-
 void mc_sampling(int dimension, int number_particles, int charge,
                  int max_variations,
                  int thermalization, int number_cycles, double step_length,
-                 double *cumulative_e, double *cumulative_e2)
+                 vec &cumulative_e, vec &cumulative_e2)
 {
   int cycles, variate, accept, dim, i, j;
   long idum;
@@ -80,57 +78,57 @@ void mc_sampling(int dimension, int number_particles, int charge,
   // allocate matrices which contain the position of the particles
   mat r_old = zeros<mat>(number_particles,dimension);
   mat r_new = zeros<mat>(number_particles,dimension);
-//  for (i = 0; i < number_particles; i++) {
-//    for ( j=0; j < dimension; j++) {
-//      r_old(i,j) = r_new(i,j) = 0; //fülle ich hier die Matrix nochmal mit Nullen?
-//    }
-//  }
   // loop over variational parameters
   for (variate=1; variate <= max_variations; variate++){
     // initialisations of variational parameters and energies
     alpha += 0.1;
-    energy = energy2 = 0; accept =0; delta_e=0;
+    energy = energy2 = 0; accept = 0; delta_e = 0;
     //  initial trial position, note calling with alpha
     //  and in three dimensions
     for (i = 0; i < number_particles; i++) {
       for ( j=0; j < dimension; j++) {
-    r_old(i,j) = step_length*(ran1(&idum)-0.5);
+        r_old(i,j) = step_length*(ran1(&idum)-0.5);
       }
     }
+    
     wfold = wave_function(r_old, alpha, dimension, number_particles);
+    
     // loop over monte carlo cycles
     for (cycles = 1; cycles <= number_cycles+thermalization; cycles++){
       // new position
       for (i = 0; i < number_particles; i++) {
-    for ( j=0; j < dimension; j++) {
-      r_new(i,j) = r_old(i,j)+step_length*(ran1(&idum)-0.5);
-    }
+        for (j = 0; j < dimension; j++) {
+          r_new(i,j) = r_old(i,j)+step_length*(ran1(&idum)-0.5);
+        }
       }
       wfnew = wave_function(r_new, alpha, dimension, number_particles);
+      
       // Metropolis test
       if(ran1(&idum) <= wfnew*wfnew/wfold/wfold ) {
-    for (i = 0; i < number_particles; i++) {
-      for ( j=0; j < dimension; j++) {
-        r_old(i,j)=r_new(i,j);
+        for (i = 0; i < number_particles; i++) {
+          for ( j=0; j < dimension; j++) {
+            r_old(i,j)=r_new(i,j);
+          }
+        }
+        wfold = wfnew;
+        accept = accept+1;
       }
-    }
-    wfold = wfnew;
-    accept = accept+1;
-      }
+
       // compute local energy
-      if ( cycles > thermalization ) {
-    delta_e = local_energy(r_old, alpha, wfold, dimension,
+      if (cycles > thermalization) {
+        delta_e = local_energy(r_old, alpha, wfold, dimension,
                                number_particles, charge);
-    // update energies
+        // update energies
         energy += delta_e;
         energy2 += delta_e*delta_e;
       }
     }   // end of loop over MC trials
-    cout << "variational parameter= " << alpha
-     << " accepted steps= " << accept << endl;
+    cout << "variational parameter= " << alpha << setw(15)
+     << "accepted steps = " << accept << endl;
     // update the energy average and its squared
-    cumulative_e[variate] = energy/number_cycles;
-    cumulative_e2[variate] = energy2/number_cycles;
+    cumulative_e(variate) = energy/number_cycles;
+    cout << cumulative_e(variate) << endl;
+    cumulative_e2(variate) = energy2/number_cycles;
 
   }    // end of loop over variational  steps
 }   // end mc_sampling function
@@ -170,7 +168,7 @@ double  local_energy(mat r, double alpha, double wfold, int dimension,
   r_plus = zeros<mat>(number_particles,dimension);
   r_minus = zeros<mat>(number_particles,dimension);
   for (i = 0; i < number_particles; i++) {
-    for ( j=0; j < dimension; j++) {
+    for (j=0; j < dimension; j++) {
       r_plus(i,j) = r_minus(i,j) = r(i,j);
     }
   }
@@ -178,8 +176,8 @@ double  local_energy(mat r, double alpha, double wfold, int dimension,
   e_kinetic = 0;
   for (i = 0; i < number_particles; i++) {
     for (j = 0; j < dimension; j++) {
-      r_plus(i,j) = r(i,j)+h;
-      r_minus(i,j) = r(i,j)-h;
+      r_plus(i,j) = r(i,j) + h;
+      r_minus(i,j) = r(i,j) - h;
       wfminus = wave_function(r_minus, alpha, dimension, number_particles);
       wfplus  = wave_function(r_plus, alpha, dimension, number_particles);
       e_kinetic -= (wfminus+wfplus-2*wfold);
@@ -189,6 +187,7 @@ double  local_energy(mat r, double alpha, double wfold, int dimension,
   }
   // include electron mass and hbar squared and divide by wave function
   e_kinetic = 0.5*h2*e_kinetic/wfold;
+
   // compute the potential energy
   e_potential = 0;
   // contribution from electron-proton potential
@@ -199,12 +198,13 @@ double  local_energy(mat r, double alpha, double wfold, int dimension,
     }
     e_potential -= charge/sqrt(r_single_particle);
   }
+  
   // contribution from electron-electron potential  TWO ELECTRONS ONLY
   for (i = 0; i < number_particles-1; i++) {
     for (j = i+1; j < number_particles; j++) {
       r_12 = 0;
       for (k = 0; k < dimension; k++) {
-    r_12 += (r(i,k)-r(j,k))*(r(i,k)-r(j,k));
+        r_12 += (r(i,k)-r(j,k))*(r(i,k)-r(j,k));
       }
       e_potential += 1/sqrt(r_12);
     }
@@ -213,10 +213,8 @@ double  local_energy(mat r, double alpha, double wfold, int dimension,
   return e_local;
 }
 
-
-
 void output(int max_variations, int number_cycles, int charge,
-            double *cumulative_e, double *cumulative_e2)
+            vec cumulative_e, vec cumulative_e2)
 {
   int i;
   double alpha, variance, error;
@@ -230,9 +228,9 @@ void output(int max_variations, int number_cycles, int charge,
     ofile << setw(15) << setprecision(8) << cumulative_e[i];
     ofile << setw(15) << setprecision(8) << variance;
     ofile << setw(15) << setprecision(8) << error << endl;
-//    fprintf(output_file, "%12.5E %12.5E %12.5E %12.5E \n", alpha,cumulative_e[i],variance, error );
+    //fprintf(ofile, "%12.5E %12.5E %12.5E %12.5E \n", alpha,cumulative_e[i],variance, error );
   }
-//  fclose (output_file);
+  //ofile.close();
 }  // end of function output
 
 #define IA 16807

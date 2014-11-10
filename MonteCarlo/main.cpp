@@ -38,7 +38,11 @@ void  output(int, int, int, mat, mat);
 // pseudo-random numbers generator
 double ran1(long *);
 // quantum force for importance sampling
-void quantum_force(int, int, mat, mat &, double, double)
+void quantum_force(int, int, mat, mat &, double, double, double)
+// ran2 for uniform deviates, initialize with negative seed.
+double ran2(long *);
+// function for gaussian random numbers
+double gaussian_deviate(long *);
 
 /* -------------------------------------------------------------------------- *
  *                        Begin of main program                               *
@@ -81,7 +85,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
   __attribute__((unused)) int dim;
   long idum;
   double wfnew, wfold, alpha, beta, energy, energy2, delta_e;
-  alpha = abegin*charge;
+  alpha = abegin;
   idum=-1;
 
   // initial positions
@@ -91,21 +95,21 @@ void mc_sampling(int dimension, int number_particles, int charge,
   // -------------- Loop over different values of alpha, beta --------------- //
   for (variate = 1; variate <= max_variations; variate++){
       alpha += astep;
-      beta = bbegin*charge;
+      beta = bbegin;
       for (variate2 = 1; variate2 <= max_variations; variate2++){ 
           beta += bstep;
           energy = energy2 = 0; accept = 0; delta_e = 0;
 
           //  initial trial position
           for (i = 0; i < number_particles; i++) {
-            for ( j = 0; j < dimension; j++) {
+            for (j = 0; j < dimension; j++) {
               r_old(i,j) = gaussian_deviate(&idum)*sqrt(timestep);
             }
           }
 
           wfold = wave_function(r_old, alpha, beta, dimension,\
                   number_particles);
-          quantum_force(number_particles, dimension, r_old, qforce_old,\
+          quantum_force(number_particles, dimension, r_old, qforce_old, alpha, \
                   beta, wfold);
           
           // -------------- loop over monte carlo cycles -------------------- //
@@ -129,10 +133,23 @@ void mc_sampling(int dimension, int number_particles, int charge,
                     number_particles);
             quantum_force(r_new, qforce_new, beta, wfnew);
 
+            // -------------- calculation of greensfunction ----------------- //
             greensfunction = 0.0;
             for (j = 0; j < dimension; j++){
-                greensfunction += 0.5*(qforce_old(i,j) + qforce_new(i,j)*\
-                        (D*timestep)
+                greensfunction += 0.5*(qforce_old(i,j) + qforce_new(i,j))*\
+                        (D*timestep*0.5*(qforce_old(i,j)) + qforce_new(i,j)\
+                         - r_new(i,j)+r_old(i,j));
+            }
+            greensfunction = exp(greensfunction);
+            
+            // the metropolis test is performed by moving one particle at 
+            // the time 
+            if (ran2(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
+                for (j = 0; j < dimension; j++){
+                    r_old(i,j) = r_new(i,j);
+                    qforce_old(i,j) = qforce_new(i,j); 
+                }
+                wfold = wfnew
             }
             
             // metropolis test
@@ -166,7 +183,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
   }    // end of loop over variational  steps
 }   // end mc_sampling function
 
-void quantum_force(int number_particles, int dimension, mat r, mat qforce, double beta, double wf)
+void quantum_force(int number_particles, int dimension, mat r, mat qforce, double alpha, double beta, double wf)
 {
     int i, j;
     double wfminus , wfplus;
@@ -185,8 +202,10 @@ void quantum_force(int number_particles, int dimension, mat r, mat qforce, doubl
         for (j = 0; j < dimension; j++){
             r_plus(i,j) = r(i,j) + h;
             r_minus(i,j) = r(i,j) - h; 
-            wfminus = wave_function(r_minus, beta);
-            wfplus = wave_function(r_plus, beta);
+            wfminus = wave_function(r_minus, alpha, beta, dimension,\
+                    number_particles);
+            wfplus = wave_function(r_plus, alpha, beta, dimension,\
+                    number_particles);
             qforce(i,j) = (wfplus - wfminus)*2.0/wf/(2*h);
             r_plus(i,j) = r(i,j);
             r_minus(i,j) = r(i,j);
@@ -219,11 +238,10 @@ double  wave_function(mat r, double alpha, double beta, int dimension, \
         int number_particles) 
 {
   int i, j, k;
-  double a, C;
+  double a;
   double wf, argument, omega, r_single_particle, r_12;
   //TODO: implement a and C in a proper way
   a = 1.0; // antiparallel spin
-  C = 1.0; // normalization
   omega = 1.0;
 
   argument = wf = 0;
@@ -246,7 +264,7 @@ double  wave_function(mat r, double alpha, double beta, int dimension, \
   }
   r_12 = sqrt(r_12);
   
-  wf = C*exp(-alpha*omega*argument*0.5)*exp(a*r_12/(1.+ beta*r_12));
+  wf = exp(-alpha*omega*argument*0.5)*exp(a*r_12/(1.+ beta*r_12));
   return wf;
 }
 
@@ -381,3 +399,115 @@ double ran1(long *idum)
    else return temp;
 }
 
+#undef IA 
+#undef IM 
+#undef AM 
+#undef IQ 
+#undef IR 
+#undef NTAB
+#undef NDIV
+#undef EPS 
+#undef RNMX
+
+/*
+** The function 
+**         ran2()
+** is a long periode (> 2 x 10^18) random number generator of 
+** L'Ecuyer and Bays-Durham shuffle and added safeguards.
+** Call with idum a negative integer to initialize; thereafter,
+** do not alter idum between sucessive deviates in a
+** sequence. RNMX should approximate the largest floating point value
+** that is less than 1.
+** The function returns a uniform deviate between 0.0 and 1.0
+** (exclusive of end-point values).
+*/
+
+#define IM1 2147483563
+#define IM2 2147483399
+#define AM (1.0/IM1)
+#define IMM1 (IM1-1)
+#define IA1 40014
+#define IA2 40692
+#define IQ1 53668
+#define IQ2 52774
+#define IR1 12211
+#define IR2 3791
+#define NTAB 32
+#define NDIV (1+IMM1/NTAB)
+#define EPS 1.2e-7
+#define RNMX (1.0-EPS)
+
+double ran2(long *idum)
+{
+  int            j;
+  long           k;
+  static long    idum2 = 123456789;
+  static long    iy=0;
+  static long    iv[NTAB];
+  double         temp;
+
+  if(*idum <= 0) {
+    if(-(*idum) < 1) *idum = 1;
+    else             *idum = -(*idum);
+    idum2 = (*idum);
+    for(j = NTAB + 7; j >= 0; j--) {
+      k     = (*idum)/IQ1;
+      *idum = IA1*(*idum - k*IQ1) - k*IR1;
+      if(*idum < 0) *idum +=  IM1;
+      if(j < NTAB)  iv[j]  = *idum;
+    }
+    iy=iv[0];
+  }
+  k     = (*idum)/IQ1;
+  *idum = IA1*(*idum - k*IQ1) - k*IR1;
+  if(*idum < 0) *idum += IM1;
+  k     = idum2/IQ2;
+  idum2 = IA2*(idum2 - k*IQ2) - k*IR2;
+  if(idum2 < 0) idum2 += IM2;
+  j     = iy/NDIV;
+  iy    = iv[j] - idum2;
+  iv[j] = *idum;
+  if(iy < 1) iy += IMM1;
+  if((temp = AM*iy) > RNMX) return RNMX;
+  else return temp;
+}
+#undef IM1
+#undef IM2
+#undef AM
+#undef IMM1
+#undef IA1
+#undef IA2
+#undef IQ1
+#undef IQ2
+#undef IR1
+#undef IR2
+#undef NTAB
+#undef NDIV
+#undef EPS
+#undef RNMX
+
+// End: function ran2()
+
+// random numbers with gaussian distribution
+double gaussian_deviate(long * idum)
+{
+  static int iset = 0;
+  static double gset;
+  double fac, rsq, v1, v2;
+
+  if ( idum < 0) iset =0;
+  if (iset == 0) {
+    do {
+      v1 = 2.*ran2(idum) -1.0;
+      v2 = 2.*ran2(idum) -1.0;
+      rsq = v1*v1+v2*v2;
+    } while (rsq >= 1.0 || rsq == 0.);
+    fac = sqrt(-2.*log(rsq)/rsq);
+    gset = v1*fac;
+    iset = 1;
+    return v2*fac;
+  } else {
+    iset =0;
+    return gset;
+  }
+} // end function for gaussian deviates

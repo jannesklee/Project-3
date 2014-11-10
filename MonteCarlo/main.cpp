@@ -115,10 +115,25 @@ void mc_sampling(int dimension, int number_particles, int charge,
               for (j = 0; j < dimension; j++) {
                 r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*\
                              sqrt(timestep) + qforce_old(i,j)*timestep*D;
+            // we move only one particle at a time
+                for (k = 0; k < number_particles; k++){
+                    if (k != i){
+                        for (j = 0; j < dimension; j++){
+                            
+                        }
+                    }
+                }
               }
             }
             wfnew = wave_function(r_new, alpha, beta, dimension,\
                     number_particles);
+            quantum_force(r_new, qforce_new, beta, wfnew);
+
+            greensfunction = 0.0;
+            for (j = 0; j < dimension; j++){
+                greensfunction += 0.5*(qforce_old(i,j) + qforce_new(i,j)*\
+                        (D*timestep)
+            }
             
             // metropolis test
             if(ran1(&idum) <= wfnew*wfnew/wfold/wfold ) {

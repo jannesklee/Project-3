@@ -18,8 +18,8 @@ ofstream ofile;
 #define h2 1000000
 #define abegin 0.7
 #define bbegin 0.1
-#define astep 0.01
-#define bstep 0.01
+#define astep 0.1
+#define bstep 0.1
 
 /* -------------------------------------------------------------------------- *
  *                        Declaration of functions                            *
@@ -43,7 +43,7 @@ double ran1(long *);
 int main()
 {
   int number_cycles = 1000000;                // number of Monte-Carlo steps  //
-  int max_variations = 50;                     // max. var. params             //
+  int max_variations = 5;                     // max. var. params             //
   int thermalization = 1000000;                // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
@@ -196,7 +196,8 @@ double  wave_function(mat r, double alpha, double beta, int dimension, \
       }
     }
   }
-
+  r_12 = sqrt(r_12);
+  
   wf = C*exp(-alpha*omega*argument*0.5)*exp(a*r_12/(1.+ beta*r_12));
   return wf;
 }

@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iomanip>
 #include <armadillo>
+//#include <lib.h>
 //#include <mpi.h>
 
 using namespace  std;
@@ -36,6 +37,8 @@ double  local_energy(mat, double, double, double, int, int, int);
 void  output(int, int, int, mat, mat);
 // pseudo-random numbers generator
 double ran1(long *);
+// quantum force for importance sampling
+void quantum_force(int, int, mat, mat &, double, double)
 
 /* -------------------------------------------------------------------------- *
  *                        Begin of main program                               *
@@ -48,7 +51,7 @@ int main()
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 2;                   // number of particles          //
-  double step_length= 1.0;                    // step length                  //
+  double step_length = 1.0;                    // step length                  //
   mat cumulative_e;                           // energy-matrix                // 
   mat cumulative_e2;                          // energy-matrix (squared)      // 
 
@@ -96,19 +99,22 @@ void mc_sampling(int dimension, int number_particles, int charge,
           //  initial trial position
           for (i = 0; i < number_particles; i++) {
             for ( j = 0; j < dimension; j++) {
-              r_old(i,j) = step_length*(ran1(&idum)-0.5);
+              r_old(i,j) = gaussian_deviate(&idum)*sqrt(timestep);
             }
           }
 
           wfold = wave_function(r_old, alpha, beta, dimension,\
                   number_particles);
+          quantum_force(number_particles, dimension, r_old, qforce_old,\
+                  beta, wfold);
           
           // -------------- loop over monte carlo cycles -------------------- //
           for (cycles = 1; cycles <= number_cycles+thermalization; cycles++){
             // new position
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
-                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
+                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*\
+                             sqrt(timestep) + qforce_old(i,j)*timestep*D;
               }
             }
             wfnew = wave_function(r_new, alpha, beta, dimension,\
@@ -145,6 +151,33 @@ void mc_sampling(int dimension, int number_particles, int charge,
   }    // end of loop over variational  steps
 }   // end mc_sampling function
 
+void quantum_force(int number_particles, int dimension, mat r, mat qforce, double beta, double wf)
+{
+    int i, j;
+    double wfminus , wfplus;
+    mat rplus, rminus;
+
+    r_plus = zeros<mat>(number_particles,dimension);
+    r_minus = zeros<mat>(number_particles,dimension);
+
+    for(i = 0 ; i < number_particles; i++) {
+        for (j = 0; j < dimension ; j++) {
+            r_plus(i,j) = r_minus(i,j) = r(i,j);
+        }
+    }
+    // quantum the first derivative
+    for (i = 0; i < number_particles; i++){
+        for (j = 0; j < dimension; j++){
+            r_plus(i,j) = r(i,j) + h;
+            r_minus(i,j) = r(i,j) - h; 
+            wfminus = wave_function(r_minus, beta);
+            wfplus = wave_function(r_plus, beta);
+            qforce(i,j) = (wfplus - wfminus)*2.0/wf/(2*h);
+            r_plus(i,j) = r(i,j);
+            r_minus(i,j) = r(i,j);
+        }
+    }
+}
 
 // Function to compute the squared wave function, simplest form
 //double  wave_function(mat r, double alpha,int dimension, int number_particles) //this function is limited to two electrons

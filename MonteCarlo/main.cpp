@@ -5,6 +5,8 @@
 #include <fstream>
 #include <iomanip>
 #include <armadillo>
+#include <singleparticle.h>  //class for single particles
+#include <manybody.h> //class for many-body problems
 //#include <mpi.h>
 
 using namespace  std;
@@ -26,10 +28,6 @@ ofstream ofile;
  * -------------------------------------------------------------------------- */
 // The Mc sampling for the variational Monte Carlo
 void  mc_sampling(int, int, int, int, int, int, double, mat &, mat &);
-// The variational wave function
-// TODO: implementation with classes 
-//double  wave_function(mat, double, int, int);  // with repulsion
-double  wave_function(mat, double, double, int, int);
 // The local energy
 double  local_energy(mat, double, double, double, int, int, int);
 // prints to screen the results of the calculations
@@ -43,14 +41,15 @@ double ran1(long *);
 int main()
 {
   int number_cycles = 1000000;                // number of Monte-Carlo steps  //
-  int max_variations = 50;                     // max. var. params             //
-  int thermalization = 1000000;                // Thermalization steps         //
+  int max_variations = 50;                    // max. var. params             //
+  int thermalization = 1000000;               // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 2;                   // number of particles          //
   double step_length= 1.0;                    // step length                  //
   mat cumulative_e;                           // energy-matrix                // 
   mat cumulative_e2;                          // energy-matrix (squared)      // 
+
 
   cumulative_e = mat(max_variations+1, max_variations+1);
   cumulative_e2 = mat(max_variations+1, max_variations+1);
@@ -77,7 +76,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
   int cycles, variate, variate2, accept, i, j;
   __attribute__((unused)) int dim;
   long idum;
-  double wfnew, wfold, alpha, beta, energy, energy2, delta_e;
+  double alpha, beta, energy, energy2, delta_e;
   alpha = abegin*charge;
   idum=-1;
 
@@ -100,8 +99,11 @@ void mc_sampling(int dimension, int number_particles, int charge,
             }
           }
 
-          wfold = wave_function(r_old, alpha, beta, dimension,\
-                  number_particles);
+          // SingleParticle particle_old(r_old, alpha, dimension,\
+                                          number_particles);
+          ManyBody particle_old(r_old, alpha, beta, dimension,\
+                                      number_particles);
+          double wfold= particle_old.Wavefunction();
           
           // -------------- loop over monte carlo cycles -------------------- //
           for (cycles = 1; cycles <= number_cycles+thermalization; cycles++){
@@ -111,8 +113,11 @@ void mc_sampling(int dimension, int number_particles, int charge,
                 r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
               }
             }
-            wfnew = wave_function(r_new, alpha, beta, dimension,\
-                    number_particles);
+            // SingleParticle particle_new(r_new, alpha, dimension,\
+                                            number_particles);
+            ManyBody particle_new(r_new, alpha, beta, dimension,\
+                                            number_particles);
+            double wfnew= particle_new.Wavefunction();
             
             // metropolis test
             if(ran1(&idum) <= wfnew*wfnew/wfold/wfold ) {
@@ -146,61 +151,6 @@ void mc_sampling(int dimension, int number_particles, int charge,
 }   // end mc_sampling function
 
 
-// Function to compute the squared wave function, simplest form
-//double  wave_function(mat r, double alpha,int dimension, int number_particles) //this function is limited to two electrons
-//{
-//  int i, j, k;
-//  double wf, argument, r_single_particle, r_12;
-//
-//  argument = wf = 0;
-//  for (i = 0; i < number_particles; i++) {
-//    r_single_particle = 0;
-//    for (j = 0; j < dimension; j++) {
-//      r_single_particle  += r(i,j)*r(i,j);
-//    }
-//    argument += sqrt(r_single_particle);
-//  }
-//  wf = exp(-argument*alpha) ;
-//  return wf;
-//}
-
-/* -------------------------------------------------------------------------- *
- *        Function to compute the squared wave function, simplest form        *
- * -------------------------------------------------------------------------- */
-double  wave_function(mat r, double alpha, double beta, int dimension, \
-        int number_particles) 
-{
-  int i, j, k;
-  double a, C;
-  double wf, argument, omega, r_single_particle, r_12;
-  //TODO: implement a and C in a proper way
-  a = 1.0; // antiparallel spin
-  C = 1.0; // normalization
-  omega = 1.0;
-
-  argument = wf = 0;
-  for (i = 0; i < number_particles; i++) {
-    r_single_particle = 0;
-    for (j = 0; j < dimension; j++) {
-      r_single_particle  += r(i,j)*r(i,j);
-    }
-    argument += r_single_particle; //TODO: check if removed squarroot is reasonable
-  }
-
-  // TODO: copied from below 
-  for (i = 0; i < number_particles-1; i++) { // for 2 electrons no loop
-    for (j = i+1; j < number_particles; j++) {
-      r_12 = 0;
-      for (k = 0; k < dimension; k++) {
-        r_12 += (r(i,k)-r(j,k))*(r(i,k)-r(j,k));
-      }
-    }
-  }
-
-  wf = C*exp(-alpha*omega*argument*0.5)*exp(a*r_12/(1.+ beta*r_12));
-  return wf;
-}
-
 /* -------------------------------------------------------------------------- *
  *        Function to calculate the local energy with num derivative          *
  * -------------------------------------------------------------------------- */
@@ -208,7 +158,7 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
             int dimension, int number_particles, int charge)
 {
   int i, j , k;
-  double e_local, wfminus, wfplus, e_kinetic, e_potential, r_12, \
+  double e_local, e_kinetic, e_potential, r_12, \
     r_single_particle;
   mat r_plus,r_minus;
 
@@ -228,8 +178,16 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
     for (j = 0; j < dimension; j++) {
       r_plus(i,j) = r(i,j) + h;
       r_minus(i,j) = r(i,j) - h;
-      wfminus = wave_function(r_minus, alpha, beta, dimension, number_particles);
-      wfplus  = wave_function(r_plus, alpha, beta, dimension, number_particles);
+      // SingleParticle particle_minus(r_minus, alpha, dimension,\
+                                      number_particles);
+      ManyBody particle_minus(r_minus, alpha, beta, dimension,\
+                              number_particles);
+      double wfminus= particle_minus.Wavefunction();
+      // SingleParticle particle_plus(r_plus, alpha, dimension,\
+                                      number_particles);
+      ManyBody particle_plus(r_plus, alpha, beta, dimension,\
+                                           number_particles);
+      double wfplus= particle_plus.Wavefunction();
       e_kinetic -= (wfminus + wfplus - 2*wfold);
       r_plus(i,j) = r(i,j);
       r_minus(i,j) = r(i,j);

@@ -25,11 +25,10 @@ double ManyBody::PerturbedWavefunction()
 {
   int i, j, k;
   double a, C;
-  double wf, argument, omega, r_single_particle, r_12;
+  double wf, argument, r_single_particle, r_12;
   //TODO: implement a and C in a proper way
   a = 1.0; // antiparallel spin
   C = 1.0; // normalization
-  omega = 1.0;
 
   argument = wf = 0;
   for (i = 0; i < m_number_particles; i++) {
@@ -50,16 +49,17 @@ double ManyBody::PerturbedWavefunction()
     }
   }
 
-  wf = C*exp(-m_alpha*omega*argument*0.5)*exp(a*r_12/(1.+ m_beta*r_12));
+  wf = C*exp(-m_alpha*m_omega*argument*0.5)*exp(a*r_12/(1.+ m_beta*r_12));
   return wf;
 }
 
 
-ManyBody::ManyBody(arma::mat r, double alpha, double beta, int dimension, int number_particles)
+ManyBody::ManyBody(arma::mat r, double alpha, double beta, int dimension, int number_particles, double omega)
 {
     m_r = r;
     m_alpha = alpha;
     m_beta = beta;
     m_dimension = dimension;
     m_number_particles = number_particles;
+    m_omega = omega;
 }

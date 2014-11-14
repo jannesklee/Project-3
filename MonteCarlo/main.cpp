@@ -27,9 +27,9 @@ ofstream ofile;
  *                        Declaration of functions                            *
  * -------------------------------------------------------------------------- */
 // The Mc sampling for the variational Monte Carlo
-void  mc_sampling(int, int, int, int, int, int, double, mat &, mat &);
+void  mc_sampling(int, int, int, int, int, int, double, mat &, mat &, double, int);
 // The local energy
-double  local_energy(mat, double, double, double, int, int, int);
+double  local_energy(mat, double, double, double, int, int, int, double, int);
 // prints to screen the results of the calculations
 void  output(int, int, int, mat, mat);
 // pseudo-random numbers generator
@@ -50,7 +50,10 @@ int main()
   mat cumulative_e;                           // energy-matrix                // 
   mat cumulative_e2;                          // energy-matrix (squared)      // 
 
-  int nx =1;                                   // quantum number for wf singleparticle //
+  int nx = 1;                                 // quantum number for wf singleparticle //
+  double omega = 1;                           // frequency harmonic oscillator        //
+
+
 
   cumulative_e = mat(max_variations+1, max_variations+1);
   cumulative_e2 = mat(max_variations+1, max_variations+1);
@@ -59,7 +62,7 @@ int main()
   // ----------------------- MC sampling ------------------------------------ //
   mc_sampling(dimension, number_particles, charge, \
               max_variations, thermalization, number_cycles, \
-              step_length, cumulative_e, cumulative_e2);
+              step_length, cumulative_e, cumulative_e2, omega, nx);
   // ------------------------- Output --------------------------------------- // 
   output(max_variations, number_cycles, charge, cumulative_e, cumulative_e2);
   ofile.close();  // close output file
@@ -73,7 +76,7 @@ int main()
 void mc_sampling(int dimension, int number_particles, int charge,
                  int max_variations,
                  int thermalization, int number_cycles, double step_length,
-                 mat &cumulative_e, mat &cumulative_e2){
+                 mat &cumulative_e, mat &cumulative_e2, double omega, int nx){
   int cycles, variate, variate2, accept, i, j;
   __attribute__((unused)) int dim;
   long idum;
@@ -99,11 +102,10 @@ void mc_sampling(int dimension, int number_particles, int charge,
               r_old(i,j) = step_length*(ran1(&idum)-0.5);
             }
           }
-
           //SingleParticle particle_old(r_old, nx, dimension,\
-                                          number_particles);
+                                          number_particles, omega);
           ManyBody particle_old(r_old, alpha, beta, dimension,\
-                                      number_particles);
+                                      number_particles, omega);
           // clearify which wavefunction shall be used: perturbed or unperturbed
           double wfold= particle_old.PerturbedWavefunction();
           // double wfold= particle_old.UnperturbedWavefunction();
@@ -117,9 +119,9 @@ void mc_sampling(int dimension, int number_particles, int charge,
               }
             }
             // SingleParticle particle_new(r_new, nx, dimension,\
-                                            number_particles);
+                                            number_particles, omega);
             ManyBody particle_new(r_new, alpha, beta, dimension,\
-                                            number_particles);
+                                            number_particles, omega);
             // clearify which wavefunction shall be used: perturbed or unperturbed
             double wfnew= particle_new.PerturbedWavefunction();
             //double wfnew= particle_new.UnperturbedWavefunction();
@@ -138,7 +140,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
             // compute local energy
             if (cycles > thermalization) {
               delta_e = local_energy(r_old, alpha, beta, wfold, dimension,
-                                     number_particles, charge);
+                                     number_particles, charge, omega, nx);
               // update energies
               energy += delta_e;
               energy2 += delta_e*delta_e;
@@ -160,7 +162,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
  *        Function to calculate the local energy with num derivative          *
  * -------------------------------------------------------------------------- */
 double  local_energy(mat r, double alpha, double beta, double wfold,\
-            int dimension, int number_particles, int charge)
+            int dimension, int number_particles, int charge, double omega, int nx)
 {
   int i, j , k;
   double e_local, e_kinetic, e_potential, r_12, \
@@ -184,15 +186,15 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
       r_plus(i,j) = r(i,j) + h;
       r_minus(i,j) = r(i,j) - h;
       // SingleParticle particle_minus(r_minus, nx, dimension,\
-                                      number_particles);
+                                      number_particles, omega);
       ManyBody particle_minus(r_minus, alpha, beta, dimension,\
-                              number_particles);
+                              number_particles, omega);
       double wfminus= particle_minus.PerturbedWavefunction();
       // double wfminus= particle_minus.UnperturbedWavefunction();
       // SingleParticle particle_plus(r_plus, nx, dimension,\
-                                      number_particles);
+                                      number_particles, omega);
       ManyBody particle_plus(r_plus, alpha, beta, dimension,\
-                                           number_particles);
+                                           number_particles, omega);
       double wfplus= particle_plus.PerturbedWavefunction();
       // double wfplus= particle_plus.UnperturbedWavefunction();
       e_kinetic -= (wfminus + wfplus - 2*wfold);

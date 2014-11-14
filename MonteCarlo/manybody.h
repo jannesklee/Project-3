@@ -10,7 +10,8 @@ public:
     int m_dimension, m_number_particles;
     ManyBody(arma::mat r, double alpha, double beta, int dimension, \
                    int number_particles);
-    double Wavefunction();
+    double PerturbedWavefunction();
+    double UnperturbedWavefunction();
 };
 
 #endif // MANYBODY_H

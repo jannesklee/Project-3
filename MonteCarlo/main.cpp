@@ -50,6 +50,7 @@ int main()
   mat cumulative_e;                           // energy-matrix                // 
   mat cumulative_e2;                          // energy-matrix (squared)      // 
 
+  int nx =1;                                   // quantum number for wf singleparticle //
 
   cumulative_e = mat(max_variations+1, max_variations+1);
   cumulative_e2 = mat(max_variations+1, max_variations+1);
@@ -99,11 +100,13 @@ void mc_sampling(int dimension, int number_particles, int charge,
             }
           }
 
-          // SingleParticle particle_old(r_old, alpha, dimension,\
+          //SingleParticle particle_old(r_old, nx, dimension,\
                                           number_particles);
           ManyBody particle_old(r_old, alpha, beta, dimension,\
                                       number_particles);
-          double wfold= particle_old.Wavefunction();
+          // clearify which wavefunction shall be used: perturbed or unperturbed
+          double wfold= particle_old.PerturbedWavefunction();
+          // double wfold= particle_old.UnperturbedWavefunction();
           
           // -------------- loop over monte carlo cycles -------------------- //
           for (cycles = 1; cycles <= number_cycles+thermalization; cycles++){
@@ -113,11 +116,13 @@ void mc_sampling(int dimension, int number_particles, int charge,
                 r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
               }
             }
-            // SingleParticle particle_new(r_new, alpha, dimension,\
+            // SingleParticle particle_new(r_new, nx, dimension,\
                                             number_particles);
             ManyBody particle_new(r_new, alpha, beta, dimension,\
                                             number_particles);
-            double wfnew= particle_new.Wavefunction();
+            // clearify which wavefunction shall be used: perturbed or unperturbed
+            double wfnew= particle_new.PerturbedWavefunction();
+            //double wfnew= particle_new.UnperturbedWavefunction();
             
             // metropolis test
             if(ran1(&idum) <= wfnew*wfnew/wfold/wfold ) {
@@ -178,16 +183,18 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
     for (j = 0; j < dimension; j++) {
       r_plus(i,j) = r(i,j) + h;
       r_minus(i,j) = r(i,j) - h;
-      // SingleParticle particle_minus(r_minus, alpha, dimension,\
+      // SingleParticle particle_minus(r_minus, nx, dimension,\
                                       number_particles);
       ManyBody particle_minus(r_minus, alpha, beta, dimension,\
                               number_particles);
-      double wfminus= particle_minus.Wavefunction();
-      // SingleParticle particle_plus(r_plus, alpha, dimension,\
+      double wfminus= particle_minus.PerturbedWavefunction();
+      // double wfminus= particle_minus.UnperturbedWavefunction();
+      // SingleParticle particle_plus(r_plus, nx, dimension,\
                                       number_particles);
       ManyBody particle_plus(r_plus, alpha, beta, dimension,\
                                            number_particles);
-      double wfplus= particle_plus.Wavefunction();
+      double wfplus= particle_plus.PerturbedWavefunction();
+      // double wfplus= particle_plus.UnperturbedWavefunction();
       e_kinetic -= (wfminus + wfplus - 2*wfold);
       r_plus(i,j) = r(i,j);
       r_minus(i,j) = r(i,j);

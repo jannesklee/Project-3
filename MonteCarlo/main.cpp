@@ -120,11 +120,11 @@ void mc_sampling(int dimension, int number_particles, int charge,
                 r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*\
                              sqrt(timestep) + qforce_old(i,j)*timestep*D;
             // we move only one particle at a time
-                for (k = 0; k < number_particles; k++){
-                    if (k != i){
-                        for (j = 0; j < dimension; j++){
-                            
-                        }
+  //              for (k = 0; k < number_particles; k++){
+  //                  if (k != i){
+  //                      for (j = 0; j < dimension; j++){
+  //                          
+  //                      }
                     }
                 }
               }
@@ -135,6 +135,8 @@ void mc_sampling(int dimension, int number_particles, int charge,
 
             // -------------- calculation of greensfunction ----------------- //
             greensfunction = 0.0;
+            // for (int i ... ) for all particles
+            //for (i = 0; i < number_particles; i++) {
             for (j = 0; j < dimension; j++){
                 greensfunction += 0.5*(qforce_old(i,j) + qforce_new(i,j))*\
                         (D*timestep*0.5*(qforce_old(i,j)) + qforce_new(i,j)\
@@ -145,6 +147,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
             // the metropolis test is performed by moving one particle at 
             // the time 
             if (ran2(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
+            //for (i = 0; i < number_particles; i++) {
                 for (j = 0; j < dimension; j++){
                     r_old(i,j) = r_new(i,j);
                     qforce_old(i,j) = qforce_new(i,j); 
@@ -152,14 +155,14 @@ void mc_sampling(int dimension, int number_particles, int charge,
                 wfold = wfnew
             }
             
-            // metropolis test
-            if(ran1(&idum) <= wfnew*wfnew/wfold/wfold ) {
-              for (i = 0; i < number_particles; i++) {
-                for ( j = 0; j < dimension; j++) {
-                  r_old(i,j)=r_new(i,j);
-                }
-              }
-              wfold = wfnew;
+//            // metropolis test
+//            if(ran1(&idum) <= wfnew*wfnew/wfold/wfold ) {
+//              for (i = 0; i < number_particles; i++) {
+//                for ( j = 0; j < dimension; j++) {
+//                  r_old(i,j)=r_new(i,j);
+//                }
+//              }
+//              wfold = wfnew;
               accept = accept + 1;
             }
 

@@ -48,6 +48,7 @@ double ManyBody::PerturbedWavefunction()
       }
     }
   }
+  r_12 = sqrt(r_12);
 
   wf = C*exp(-m_alpha*m_omega*argument*0.5)*exp(a*r_12/(1.+ m_beta*r_12));
   return wf;

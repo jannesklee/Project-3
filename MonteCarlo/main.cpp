@@ -5,8 +5,10 @@
 #include <fstream>
 #include <iomanip>
 #include <armadillo>
+#include "lib.h"
 #include "singleparticle.h"  //class for single particles
 #include "manybody.h" //class for many-body problems
+#include <omp.h>
 //#include <mpi.h>
 
 using namespace  std;
@@ -89,6 +91,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
   mat r_new = zeros<mat>(number_particles, dimension);
    
   // -------------- Loop over different values of alpha, beta --------------- //
+  #pragma omp parallel for
   for (variate = 1; variate <= max_variations; variate++){
       alpha += astep;
       beta = bbegin*charge;
@@ -107,7 +110,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
           ManyBody particle_old(r_old, alpha, beta, dimension,\
                                       number_particles, omega);
           // clearify which wavefunction shall be used: perturbed or unperturbed
-          double wfold= particle_old.PerturbedWavefunction();
+          double wfold = particle_old.PerturbedWavefunction();
           // double wfold= particle_old.UnperturbedWavefunction();
           
           // -------------- loop over monte carlo cycles -------------------- //
@@ -123,7 +126,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
             ManyBody particle_new(r_new, alpha, beta, dimension,\
                                             number_particles, omega);
             // clearify which wavefunction shall be used: perturbed or unperturbed
-            double wfnew= particle_new.PerturbedWavefunction();
+            double wfnew = particle_new.PerturbedWavefunction();
             //double wfnew= particle_new.UnperturbedWavefunction();
             
             // metropolis test
@@ -156,62 +159,6 @@ void mc_sampling(int dimension, int number_particles, int charge,
       }
   }    // end of loop over variational  steps
 }   // end mc_sampling function
-
-
-// Function to compute the squared wave function, simplest form
-//double  wave_function(mat r, double alpha,int dimension, int number_particles) //this function is limited to two electrons
-//{
-//  int i, j, k;
-//  double wf, argument, r_single_particle, r_12;
-//
-//  argument = wf = 0;
-//  for (i = 0; i < number_particles; i++) {
-//    r_single_particle = 0;
-//    for (j = 0; j < dimension; j++) {
-//      r_single_particle  += r(i,j)*r(i,j);
-//    }
-//    argument += sqrt(r_single_particle);
-//  }
-//  wf = exp(-argument*alpha) ;
-//  return wf;
-//}
-
-/* -------------------------------------------------------------------------- *
- *        Function to compute the squared wave function, simplest form        *
- * -------------------------------------------------------------------------- */
-double  wave_function(mat r, double alpha, double beta, int dimension, \
-        int number_particles) 
-{
-  int i, j, k;
-  double a, C;
-  double wf, argument, omega, r_single_particle, r_12;
-  //TODO: implement a and C in a proper way
-  a = 1.0; // antiparallel spin
-  C = 1.0; // normalization
-  omega = 1.0;
-
-  argument = wf = 0;
-  for (i = 0; i < number_particles; i++) {
-    r_single_particle = 0;
-    for (j = 0; j < dimension; j++) {
-      r_single_particle  += r(i,j)*r(i,j);
-    }
-    argument += r_single_particle; //TODO: check if removed squarroot is reasonable
-  }
-
-  // TODO: copied from below 
-  for (i = 0; i < number_particles-1; i++) { // for 2 electrons no loop
-    for (j = i+1; j < number_particles; j++) {
-      r_12 = 0;
-      for (k = 0; k < dimension; k++) {
-        r_12 += (r(i,k)-r(j,k))*(r(i,k)-r(j,k));
-      }
-    }
-  }
-
-  wf = C*exp(-alpha*omega*argument*0.5)*exp(a*r_12/(1.+ beta*r_12));
-  return wf;
-}
 
 /* -------------------------------------------------------------------------- *
  *        Function to calculate the local energy with num derivative          *
@@ -312,45 +259,45 @@ void output(int max_variations, int number_cycles, int charge,
   }
 } 
 
-/* -------------------------------------------------------------------------- *
- *                    Random number generator                                 *
- * -------------------------------------------------------------------------- */
-#define IA 16807
-#define IM 2147483647
-#define AM (1.0/IM)
-#define IQ 127773
-#define IR 2836
-#define NTAB 32
-#define NDIV (1+(IM-1)/NTAB)
-#define EPS 1.2e-7
-#define RNMX (1.0-EPS)
-
-double ran1(long *idum)
-{
-   int             j;
-   long            k;
-   static long     iy=0;
-   static long     iv[NTAB];
-   double          temp;
-
-   if (*idum <= 0 || !iy) {
-      if (-(*idum) < 1) *idum=1;
-      else *idum = -(*idum);
-      for(j = NTAB + 7; j >= 0; j--) {
-         k     = (*idum)/IQ;
-         *idum = IA*(*idum - k*IQ) - IR*k;
-         if(*idum < 0) *idum += IM;
-         if(j < NTAB) iv[j] = *idum;
-      }
-      iy = iv[0];
-   }
-   k     = (*idum)/IQ;
-   *idum = IA*(*idum - k*IQ) - IR*k;
-   if(*idum < 0) *idum += IM;
-   j     = iy/NDIV;
-   iy    = iv[j];
-   iv[j] = *idum;
-   if((temp=AM*iy) > RNMX) return RNMX;
-   else return temp;
-}
-
+///* -------------------------------------------------------------------------- *
+// *                    Random number generator                                 *
+// * -------------------------------------------------------------------------- */
+//#define IA 16807
+//#define IM 2147483647
+//#define AM (1.0/IM)
+//#define IQ 127773
+//#define IR 2836
+//#define NTAB 32
+//#define NDIV (1+(IM-1)/NTAB)
+//#define EPS 1.2e-7
+//#define RNMX (1.0-EPS)
+//
+//double ran1(long *idum)
+//{
+//   int             j;
+//   long            k;
+//   static long     iy=0;
+//   static long     iv[NTAB];
+//   double          temp;
+//
+//   if (*idum <= 0 || !iy) {
+//      if (-(*idum) < 1) *idum=1;
+//      else *idum = -(*idum);
+//      for(j = NTAB + 7; j >= 0; j--) {
+//         k     = (*idum)/IQ;
+//         *idum = IA*(*idum - k*IQ) - IR*k;
+//         if(*idum < 0) *idum += IM;
+//         if(j < NTAB) iv[j] = *idum;
+//      }
+//      iy = iv[0];
+//   }
+//   k     = (*idum)/IQ;
+//   *idum = IA*(*idum - k*IQ) - IR*k;
+//   if(*idum < 0) *idum += IM;
+//   j     = iy/NDIV;
+//   iy    = iv[j];
+//   iv[j] = *idum;
+//   if((temp=AM*iy) > RNMX) return RNMX;
+//   else return temp;
+//}
+//

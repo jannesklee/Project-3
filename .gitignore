@@ -1,3 +1,4 @@
 *.dat
 lib*
 *.out
+*.o

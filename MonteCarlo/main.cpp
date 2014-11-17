@@ -5,8 +5,8 @@
 #include <fstream>
 #include <iomanip>
 #include <armadillo>
-#include <singleparticle.h>  //class for single particles
-#include <manybody.h> //class for many-body problems
+#include "singleparticle.h"  //class for single particles
+#include "manybody.h" //class for many-body problems
 //#include <mpi.h>
 
 using namespace  std;
@@ -158,64 +158,6 @@ void mc_sampling(int dimension, int number_particles, int charge,
 }   // end mc_sampling function
 
 
-<<<<<<< HEAD
-// Function to compute the squared wave function, simplest form
-//double  wave_function(mat r, double alpha,int dimension, int number_particles) //this function is limited to two electrons
-//{
-//  int i, j, k;
-//  double wf, argument, r_single_particle, r_12;
-//
-//  argument = wf = 0;
-//  for (i = 0; i < number_particles; i++) {
-//    r_single_particle = 0;
-//    for (j = 0; j < dimension; j++) {
-//      r_single_particle  += r(i,j)*r(i,j);
-//    }
-//    argument += sqrt(r_single_particle);
-//  }
-//  wf = exp(-argument*alpha) ;
-//  return wf;
-//}
-
-/* -------------------------------------------------------------------------- *
- *        Function to compute the squared wave function, simplest form        *
- * -------------------------------------------------------------------------- */
-double  wave_function(mat r, double alpha, double beta, int dimension, \
-        int number_particles) 
-{
-  int i, j, k;
-  double a, C;
-  double wf, argument, omega, r_single_particle, r_12;
-  //TODO: implement a and C in a proper way
-  a = 1.0; // antiparallel spin
-  C = 1.0; // normalization
-  omega = 1.0;
-
-  argument = wf = 0;
-  for (i = 0; i < number_particles; i++) {
-    r_single_particle = 0;
-    for (j = 0; j < dimension; j++) {
-      r_single_particle  += r(i,j)*r(i,j);
-    }
-    argument += r_single_particle; //TODO: check if removed squarroot is reasonable
-  }
-
-  // TODO: copied from below 
-  for (i = 0; i < number_particles-1; i++) { // for 2 electrons no loop
-    for (j = i+1; j < number_particles; j++) {
-      r_12 = 0;
-      for (k = 0; k < dimension; k++) {
-        r_12 += (r(i,k)-r(j,k))*(r(i,k)-r(j,k));
-      }
-    }
-  }
-  r_12 = sqrt(r_12);
-  
-  wf = C*exp(-alpha*omega*argument*0.5)*exp(a*r_12/(1.+ beta*r_12));
-  return wf;
-}
-
-||||||| merged common ancestors
 // Function to compute the squared wave function, simplest form
 //double  wave_function(mat r, double alpha,int dimension, int number_particles) //this function is limited to two electrons
 //{
@@ -271,8 +213,6 @@ double  wave_function(mat r, double alpha, double beta, int dimension, \
   return wf;
 }
 
-=======
->>>>>>> f7bcd1bdfeec8f0e58b6a0c635b102e001e00c2b
 /* -------------------------------------------------------------------------- *
  *        Function to calculate the local energy with num derivative          *
  * -------------------------------------------------------------------------- */

@@ -29,7 +29,8 @@ ofstream ofile;
  *                        Declaration of functions                            *
  * -------------------------------------------------------------------------- */
 // The Mc sampling for the variational Monte Carlo
-void  mc_sampling(int, int, int, int, int, int, double, mat &, mat &, double, int);
+void  mc_sampling(int, int, int, int, int, int, double, mat &, mat &, double,\
+        int);
 // The local energy
 double  local_energy(mat, double, double, double, int, int, int, double, int);
 // prints to screen the results of the calculations
@@ -42,7 +43,7 @@ double ran1(long *);
  * -------------------------------------------------------------------------- */
 int main()
 {
-  int number_cycles = 1000000;                // number of Monte-Carlo steps  //
+  int number_cycles = 100000;                // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
   int thermalization = 1000000;               // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
@@ -52,8 +53,8 @@ int main()
   mat cumulative_e;                           // energy-matrix                // 
   mat cumulative_e2;                          // energy-matrix (squared)      // 
 
-  int nx = 1;                                 // quantum number for wf singleparticle //
-  double omega = 1;                           // frequency harmonic oscillator        //
+  int nx = 1;                                 // qu. num. for sing. particle  //
+  double omega = 1;                           // freq. harm. osc.             //
 
 
 
@@ -91,7 +92,6 @@ void mc_sampling(int dimension, int number_particles, int charge,
   mat r_new = zeros<mat>(number_particles, dimension);
    
   // -------------- Loop over different values of alpha, beta --------------- //
-  #pragma omp parallel for
   for (variate = 1; variate <= max_variations; variate++){
       alpha += astep;
       beta = bbegin*charge;
@@ -125,7 +125,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
                                             number_particles, omega);
             ManyBody particle_new(r_new, alpha, beta, dimension,\
                                             number_particles, omega);
-            // clearify which wavefunction shall be used: perturbed or unperturbed
+            // clearify which wavefunction shall be used: perturbed or unpert.
             double wfnew = particle_new.PerturbedWavefunction();
             //double wfnew= particle_new.UnperturbedWavefunction();
             
@@ -150,7 +150,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
             }
           }   
 
-          cout << "alpha = " << alpha << setw(20)
+          cout << "alpha = " << alpha << setw(15)
                << "beta = " << beta << setw(20)
                << "accepted steps = " << accept << endl;
           // update the energy average and its squared

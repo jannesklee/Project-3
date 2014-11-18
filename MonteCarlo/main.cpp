@@ -43,7 +43,7 @@ double ran1(long *);
  * -------------------------------------------------------------------------- */
 int main()
 {
-  int number_cycles = 100000;                // number of Monte-Carlo steps  //
+  int number_cycles = 100000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
   int thermalization = 1000000;               // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
@@ -52,6 +52,7 @@ int main()
   double step_length= 1.0;                    // step length                  //
   mat cumulative_e;                           // energy-matrix                // 
   mat cumulative_e2;                          // energy-matrix (squared)      // 
+  __attribute__((unused)) int tid, nthreads;
 
   int nx = 1;                                 // qu. num. for sing. particle  //
   double omega = 1;                           // freq. harm. osc.             //
@@ -60,6 +61,27 @@ int main()
 
   cumulative_e = mat(max_variations+1, max_variations+1);
   cumulative_e2 = mat(max_variations+1, max_variations+1);
+
+//#pragma omp parallel private(nthreads, tid)
+//      {
+//      /* Obtain thread number */
+//      tid = omp_get_thread_num();
+//#pragma omp critical
+//      {
+//      cout << "Hello World from thread = " << tid << endl;
+//      }
+//
+//      /* Only master thread does this */
+//      if (tid == 0) 
+//      {
+//        nthreads = omp_get_num_threads();
+//#pragma omp critical
+//        {
+//        cout << "Number of threads = " << nthreads << endl;
+//        }
+//      }
+//
+//      }  /* All threads join master thread and disband */
 
   ofile.open("vmc.dat");
   // ----------------------- MC sampling ------------------------------------ //
@@ -80,18 +102,20 @@ void mc_sampling(int dimension, int number_particles, int charge,
                  int max_variations,
                  int thermalization, int number_cycles, double step_length,
                  mat &cumulative_e, mat &cumulative_e2, double omega, int nx){
-  int cycles, variate, variate2, accept, i, j;
+  int cycles, variate, variate2, accept, i, j, thread;
   __attribute__((unused)) int dim;
   long idum;
-  double alpha, beta, energy, energy2, delta_e;
+  double alpha, beta, energy, energy2, delta_e, wfold, wfnew;
   alpha = abegin*charge;
   idum=-1;
+
 
   // initial positions
   mat r_old = zeros<mat>(number_particles, dimension);
   mat r_new = zeros<mat>(number_particles, dimension);
    
   // -------------- Loop over different values of alpha, beta --------------- //
+//#pragma omp parallel for private(variate,variate2,i,j) reduction(+:energy,energy2,accept)
   for (variate = 1; variate <= max_variations; variate++){
       alpha += astep;
       beta = bbegin*charge;
@@ -101,44 +125,50 @@ void mc_sampling(int dimension, int number_particles, int charge,
 
           //  initial trial position
           for (i = 0; i < number_particles; i++) {
-            for ( j = 0; j < dimension; j++) {
+            for (j = 0; j < dimension; j++) {
               r_old(i,j) = step_length*(ran1(&idum)-0.5);
             }
           }
-          //SingleParticle particle_old(r_old, nx, dimension,\
-                                          number_particles, omega);
+          /*SingleParticle particle_old(r_old, nx, dimension,\
+                                          number_particles, omega);*/
           ManyBody particle_old(r_old, alpha, beta, dimension,\
                                       number_particles, omega);
           // clearify which wavefunction shall be used: perturbed or unperturbed
-          double wfold = particle_old.PerturbedWavefunction();
+          wfold = particle_old.PerturbedWavefunction();
           // double wfold= particle_old.UnperturbedWavefunction();
           
           // -------------- loop over monte carlo cycles -------------------- //
+//#pragma omp parallel for private(cycles,i,j)
           for (cycles = 1; cycles <= number_cycles+thermalization; cycles++){
             // new position
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
                 r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
+                thread = omp_get_thread_num();
+                {
+                  cout << "thread   " << thread << endl << "   rnew   " << r_new(i,j)<<endl;
+                } 
               }
             }
-            // SingleParticle particle_new(r_new, nx, dimension,\
-                                            number_particles, omega);
+            /* SingleParticle particle_new(r_new, nx, dimension,\
+                                            number_particles, omega);*/
             ManyBody particle_new(r_new, alpha, beta, dimension,\
                                             number_particles, omega);
             // clearify which wavefunction shall be used: perturbed or unpert.
-            double wfnew = particle_new.PerturbedWavefunction();
+            wfnew = particle_new.PerturbedWavefunction();
             //double wfnew= particle_new.UnperturbedWavefunction();
             
             // metropolis test
             if(ran1(&idum) <= wfnew*wfnew/wfold/wfold ) {
               for (i = 0; i < number_particles; i++) {
-                for ( j = 0; j < dimension; j++) {
-                  r_old(i,j)=r_new(i,j);
+                for (j = 0; j < dimension; j++) {
+                  r_old(i,j) = r_new(i,j);
                 }
               }
               wfold = wfnew;
               accept = accept + 1;
             }
+            thread = omp_get_thread_num();
 
             // compute local energy
             if (cycles > thermalization) {
@@ -150,15 +180,20 @@ void mc_sampling(int dimension, int number_particles, int charge,
             }
           }   
 
+//#pragma omp critical
+          {
           cout << "alpha = " << alpha << setw(15)
                << "beta = " << beta << setw(20)
-               << "accepted steps = " << accept << endl;
+               << "accepted steps = " << accept << setw(20)
+               << "thread = " << thread << endl;
           // update the energy average and its squared
+          }
           cumulative_e(variate, variate2) = energy/number_cycles;
           cumulative_e2(variate, variate2) = energy2/number_cycles;
       }
   }    // end of loop over variational  steps
 }   // end mc_sampling function
+
 
 /* -------------------------------------------------------------------------- *
  *        Function to calculate the local energy with num derivative          *
@@ -168,7 +203,7 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
 {
   int i, j , k;
   double e_local, e_kinetic, e_potential, r_12, \
-    r_single_particle;
+    r_single_particle, wfminus, wfplus;
   mat r_plus,r_minus;
 
   // allocate matrices which contain the position of the particles
@@ -176,7 +211,7 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
   r_plus = zeros<mat>(number_particles,dimension);
   r_minus = zeros<mat>(number_particles,dimension);
   for (i = 0; i < number_particles; i++) {
-    for (j=0; j < dimension; j++) {
+    for (j = 0; j < dimension; j++) {
       r_plus(i,j) = r_minus(i,j) = r(i,j);
     }
   }
@@ -187,17 +222,17 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
     for (j = 0; j < dimension; j++) {
       r_plus(i,j) = r(i,j) + h;
       r_minus(i,j) = r(i,j) - h;
-      // SingleParticle particle_minus(r_minus, nx, dimension,\
-                                      number_particles, omega);
+      // SingleParticle particle_minus(r_minus, nx, dimension,
+      //                                number_particles, omega);
       ManyBody particle_minus(r_minus, alpha, beta, dimension,\
                               number_particles, omega);
-      double wfminus= particle_minus.PerturbedWavefunction();
+      wfminus= particle_minus.PerturbedWavefunction();
       // double wfminus= particle_minus.UnperturbedWavefunction();
-      // SingleParticle particle_plus(r_plus, nx, dimension,\
-                                      number_particles, omega);
+      // SingleParticle particle_plus(r_plus, nx, dimension,
+      //                                number_particles, omega);
       ManyBody particle_plus(r_plus, alpha, beta, dimension,\
                                            number_particles, omega);
-      double wfplus= particle_plus.PerturbedWavefunction();
+      wfplus= particle_plus.PerturbedWavefunction();
       // double wfplus= particle_plus.UnperturbedWavefunction();
       e_kinetic -= (wfminus + wfplus - 2*wfold);
       r_plus(i,j) = r(i,j);
@@ -300,4 +335,4 @@ void output(int max_variations, int number_cycles, int charge,
 //   if((temp=AM*iy) > RNMX) return RNMX;
 //   else return temp;
 //}
-//
+

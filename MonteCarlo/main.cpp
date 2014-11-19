@@ -35,8 +35,10 @@ void  mc_sampling(int, int, int, int, int, int, double, mat &, mat &, double,\
 double  local_energy(mat, double, double, double, int, int, int, double, int);
 // prints to screen the results of the calculations
 void  output(int, int, int, mat, mat);
-// pseudo-random numbers generator
-double ran1(long *);
+// quantum force for importance sampling
+void quantum_force(int, int, double, double, double, double, mat, mat &);
+// function for gaussian random numbers
+double gaussian_deviate(long *);
 
 /* -------------------------------------------------------------------------- *
  *                        Begin of main program                               *
@@ -45,43 +47,18 @@ int main()
 {
   int number_cycles = 100000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
-  int thermalization = 1000000;               // Thermalization steps         //
+  int thermalization = 10000;               // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 2;                   // number of particles          //
-  double step_length= 1.0;                    // step length                  //
+  double step_length= 5.0;                    // step length                  //
   mat cumulative_e;                           // energy-matrix                // 
   mat cumulative_e2;                          // energy-matrix (squared)      // 
-  __attribute__((unused)) int tid, nthreads;
-
   int nx = 1;                                 // qu. num. for sing. particle  //
   double omega = 1;                           // freq. harm. osc.             //
 
-
-
   cumulative_e = mat(max_variations+1, max_variations+1);
   cumulative_e2 = mat(max_variations+1, max_variations+1);
-
-//#pragma omp parallel private(nthreads, tid)
-//      {
-//      /* Obtain thread number */
-//      tid = omp_get_thread_num();
-//#pragma omp critical
-//      {
-//      cout << "Hello World from thread = " << tid << endl;
-//      }
-//
-//      /* Only master thread does this */
-//      if (tid == 0) 
-//      {
-//        nthreads = omp_get_num_threads();
-//#pragma omp critical
-//        {
-//        cout << "Number of threads = " << nthreads << endl;
-//        }
-//      }
-//
-//      }  /* All threads join master thread and disband */
 
   ofile.open("vmc.dat");
   // ----------------------- MC sampling ------------------------------------ //
@@ -102,19 +79,25 @@ void mc_sampling(int dimension, int number_particles, int charge,
                  int max_variations,
                  int thermalization, int number_cycles, double step_length,
                  mat &cumulative_e, mat &cumulative_e2, double omega, int nx){
+
   int cycles, variate, variate2, accept, i, j, thread;
-  __attribute__((unused)) int dim;
   long idum;
   double alpha, beta, energy, energy2, delta_e, wfold, wfnew;
+  double D, timestep, greensfunction;
+  timestep = 0.01; // 0.1 - 0.001 
+  D = 0.5; // 
+
   alpha = abegin*charge;
   idum=-1;
 
-
-  // initial positions
+  // initial positions, initial forces
   mat r_old = zeros<mat>(number_particles, dimension);
   mat r_new = zeros<mat>(number_particles, dimension);
+  mat qforce_old = zeros<mat>(number_particles, dimension);
+  mat qforce_new = zeros<mat>(number_particles, dimension);
    
   // -------------- Loop over different values of alpha, beta --------------- //
+// TODO: parallelization is not working because of metropolis test loop
 //#pragma omp parallel for private(variate,variate2,i,j) reduction(+:energy,energy2,accept)
   for (variate = 1; variate <= max_variations; variate++){
       alpha += astep;
@@ -126,51 +109,72 @@ void mc_sampling(int dimension, int number_particles, int charge,
           //  initial trial position
           for (i = 0; i < number_particles; i++) {
             for (j = 0; j < dimension; j++) {
-              r_old(i,j) = step_length*(ran1(&idum)-0.5);
+              //r_old(i,j) = step_length*(ran1(&idum)-0.5);
+              r_old(i,j) = gaussian_deviate(&idum)*sqrt(timestep);
             }
           }
+
           /*SingleParticle particle_old(r_old, nx, dimension,\
                                           number_particles, omega);*/
           ManyBody particle_old(r_old, alpha, beta, dimension,\
                                       number_particles, omega);
-          // clearify which wavefunction shall be used: perturbed or unperturbed
+         
+          // clearify which wavefunction shall be used: perturbed or unperturbed 
           wfold = particle_old.PerturbedWavefunction();
-          // double wfold= particle_old.UnperturbedWavefunction();
+          //wfold= particle_old.UnperturbedWavefunction();
+
+          quantum_force(number_particles, dimension, alpha, beta, omega, \
+                  wfold, r_old, qforce_old);
           
           // -------------- loop over monte carlo cycles -------------------- //
-//#pragma omp parallel for private(cycles,i,j)
           for (cycles = 1; cycles <= number_cycles+thermalization; cycles++){
             // new position
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
-                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
-                thread = omp_get_thread_num();
-                {
-                  cout << "thread   " << thread << endl << "   rnew   " << r_new(i,j)<<endl;
-                } 
+               // r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
+                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*\
+                             sqrt(timestep) + qforce_old(i,j)*timestep*D;
               }
             }
+
             /* SingleParticle particle_new(r_new, nx, dimension,\
                                             number_particles, omega);*/
             ManyBody particle_new(r_new, alpha, beta, dimension,\
                                             number_particles, omega);
+
             // clearify which wavefunction shall be used: perturbed or unpert.
             wfnew = particle_new.PerturbedWavefunction();
-            //double wfnew= particle_new.UnperturbedWavefunction();
+            //wfnew= particle_new.UnperturbedWavefunction();
+           
+            quantum_force(number_particles, dimension, alpha, beta, omega,\
+                    wfnew, r_new, qforce_new);
             
-            // metropolis test
-            if(ran1(&idum) <= wfnew*wfnew/wfold/wfold ) {
-              for (i = 0; i < number_particles; i++) {
+            // ------------------ greensfunction ---------------------------- //
+            greensfunction = 0.0;
+            for (i = 0; i < number_particles; i++) {
                 for (j = 0; j < dimension; j++) {
-                  r_old(i,j) = r_new(i,j);
+                    greensfunction += 0.5*(qforce_old(i,j) - qforce_new(i,j))* \
+                          (D*timestep*0.5*(qforce_old(i,j) - qforce_new(i,j))- \
+                           r_new(i,j) + r_old(i,j));
                 }
-              }
-              wfold = wfnew;
-              accept = accept + 1;
             }
+            greensfunction = exp(greensfunction);
+
+            // ----------------- metropolis test ---------------------------- //
+            if (ran2(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
+                for (i = 0; i < number_particles; i++) {
+                    for (j = 0; j < dimension; j++){
+                        r_old(i,j) = r_new(i,j);
+                        qforce_old(i,j) = qforce_new(i,j); 
+                    }
+                }
+                wfold = wfnew;
+                accept = accept + 1;
+            }
+
             thread = omp_get_thread_num();
 
-            // compute local energy
+            // ----------------- local energy ------------------------------- //
             if (cycles > thermalization) {
               delta_e = local_energy(r_old, alpha, beta, wfold, dimension,
                                      number_particles, charge, omega, nx);
@@ -178,7 +182,8 @@ void mc_sampling(int dimension, int number_particles, int charge,
               energy += delta_e;
               energy2 += delta_e*delta_e;
             }
-          }   
+          } 
+          // ------------- end loop over monte carlo cycles ----------------- //    
 
 //#pragma omp critical
           {
@@ -194,6 +199,40 @@ void mc_sampling(int dimension, int number_particles, int charge,
   }    // end of loop over variational  steps
 }   // end mc_sampling function
 
+
+void quantum_force(int number_particles, int dimension, double alpha, \
+        double beta, double omega, double wf, mat r, mat &qforce)
+{
+    int i, j;
+    double wfminus , wfplus;
+    mat r_plus, r_minus;
+
+    r_plus = zeros<mat>(number_particles,dimension);
+    r_minus = zeros<mat>(number_particles,dimension);
+
+    for(i = 0 ; i < number_particles; i++) {
+        for (j = 0; j < dimension ; j++) {
+            r_plus(i,j) = r_minus(i,j) = r(i,j);
+        }
+    }
+
+    // quantum the first derivative
+    for (i = 0; i < number_particles; i++){
+        for (j = 0; j < dimension; j++){
+            r_plus(i,j) = r(i,j) + h;
+            r_minus(i,j) = r(i,j) - h; 
+            ManyBody particle_minus(r_minus, alpha, beta, dimension,\
+                                            number_particles, omega);
+            wfminus = particle_minus.PerturbedWavefunction();
+            ManyBody particle_plus(r_plus, alpha, beta, dimension,\
+                                            number_particles, omega);
+            wfplus = particle_plus.PerturbedWavefunction();
+            qforce(i,j) = (wfplus - wfminus)/(wf*h);
+            r_plus(i,j) = r(i,j);
+            r_minus(i,j) = r(i,j);
+        }
+    }
+}
 
 /* -------------------------------------------------------------------------- *
  *        Function to calculate the local energy with num derivative          *
@@ -293,6 +332,30 @@ void output(int max_variations, int number_cycles, int charge,
       ofile << endl;
   }
 } 
+
+// random numbers with gaussian distribution
+double gaussian_deviate(long * idum)
+{
+  static int iset = 0;
+  static double gset;
+  double fac, rsq, v1, v2;
+
+  if ( idum < 0) iset =0;
+  if (iset == 0) {
+    do {
+      v1 = 2.*ran2(idum) -1.0;
+      v2 = 2.*ran2(idum) -1.0;
+      rsq = v1*v1+v2*v2;
+    } while (rsq >= 1.0 || rsq == 0.);
+    fac = sqrt(-2.*log(rsq)/rsq);
+    gset = v1*fac;
+    iset = 1;
+    return v2*fac;
+  } else {
+    iset =0;
+    return gset;
+  }
+} // end function for gaussian deviates
 
 ///* -------------------------------------------------------------------------- *
 // *                    Random number generator                                 *

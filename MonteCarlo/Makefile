@@ -4,11 +4,11 @@ CFLAGS = -Wall -larmadillo -llapack -lblas -fopenmp $(DEBUG)
 DEPS = singleparticle.h manybody.h lib.h
 OBJ = main.o singleparticle.o manybody.o lib.o
 
-%.o: $(DEPS)
-	$(CC) $(CFLAGS)-c -o $@ $<
+%.o: %.cpp $(DEPS)
+	LC_MESSAGES=C $(CC) -c $(CFLAGS) -o $@ $<
 
 main.out: $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $^ 
+	LC_MESSAGES=C $(CC) $(CFLAGS) -o $@ $^ 
 
 all: main.out 
 

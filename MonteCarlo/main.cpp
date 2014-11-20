@@ -20,8 +20,8 @@ ofstream ofile;
 // the step length and its squared inverse for the second derivative
 #define h 0.001
 #define h2 1000000
-#define abegin 0.7
-#define bbegin 0.1
+#define abegin 0.9
+#define bbegin 0.3
 #define astep 0.1
 #define bstep 0.1
 
@@ -46,25 +46,43 @@ double gaussian_deviate(long *);
 int main()
 {
   int number_cycles = 100000;                 // number of Monte-Carlo steps  //
-  int max_variations = 5;                     // max. var. params             //
-  int thermalization = 10000;               // Thermalization steps         //
+  int max_variations = 1;                    // max. var. params             //
+  int thermalization = 10000;                 // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 2;                   // number of particles          //
-  double step_length= 5.0;                    // step length                  //
-  mat cumulative_e;                           // energy-matrix                // 
-  mat cumulative_e2;                          // energy-matrix (squared)      // 
+  double step_length= 1.0;                    // step length                  //
+  mat cumulative_e, cumulative_e2;            // energy-matrices              // 
+  mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      // 
   int nx = 1;                                 // qu. num. for sing. particle  //
   double omega = 1;                           // freq. harm. osc.             //
+  int num_threads;                            // number of threads            // 
 
   cumulative_e = mat(max_variations+1, max_variations+1);
   cumulative_e2 = mat(max_variations+1, max_variations+1);
 
   ofile.open("vmc.dat");
   // ----------------------- MC sampling ------------------------------------ //
+#pragma omp parallel shared(cumulative_e, cumulative_e2) 
+  {
+  cumulative_e_temp = mat(max_variations+1, max_variations+1);
+  cumulative_e2_temp = mat(max_variations+1, max_variations+1);
   mc_sampling(dimension, number_particles, charge, \
               max_variations, thermalization, number_cycles, \
-              step_length, cumulative_e, cumulative_e2, omega, nx);
+              step_length, cumulative_e_temp, cumulative_e2_temp, omega, nx);
+#pragma omp barrier
+#pragma omp critical
+  {
+      cumulative_e += cumulative_e_temp;
+      cumulative_e2 += cumulative_e2_temp;
+  }
+    num_threads = omp_get_num_threads();
+  }
+  cout << num_threads << endl;
+  cumulative_e = cumulative_e/num_threads;
+  cumulative_e2 = cumulative_e2/num_threads;
+  
+
   // ------------------------- Output --------------------------------------- // 
   output(max_variations, number_cycles, charge, cumulative_e, cumulative_e2);
   ofile.close();  // close output file
@@ -97,8 +115,6 @@ void mc_sampling(int dimension, int number_particles, int charge,
   mat qforce_new = zeros<mat>(number_particles, dimension);
    
   // -------------- Loop over different values of alpha, beta --------------- //
-// TODO: parallelization is not working because of metropolis test loop
-//#pragma omp parallel for private(variate,variate2,i,j) reduction(+:energy,energy2,accept)
   for (variate = 1; variate <= max_variations; variate++){
       alpha += astep;
       beta = bbegin*charge;
@@ -185,16 +201,14 @@ void mc_sampling(int dimension, int number_particles, int charge,
           } 
           // ------------- end loop over monte carlo cycles ----------------- //    
 
-//#pragma omp critical
+#pragma omp critical
           {
           cout << "alpha = " << alpha << setw(15)
                << "beta = " << beta << setw(20)
                << "accepted steps = " << accept << setw(20)
+               << "energy = " << cumulative_e(variate,variate2) << setw(20)
                << "thread = " << thread << endl;
-          // update the energy average and its squared
           }
-          cumulative_e(variate, variate2) = energy/number_cycles;
-          cumulative_e2(variate, variate2) = energy2/number_cycles;
       }
   }    // end of loop over variational  steps
 }   // end mc_sampling function

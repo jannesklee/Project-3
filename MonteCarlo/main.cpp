@@ -20,8 +20,8 @@ ofstream ofile;
 // the step length and its squared inverse for the second derivative
 #define h 0.001
 #define h2 1000000
-#define abegin 0.9
-#define bbegin 0.3
+#define abegin 0.7
+#define bbegin 0.0
 #define astep 0.1
 #define bstep 0.1
 
@@ -45,13 +45,13 @@ double gaussian_deviate(long *);
  * -------------------------------------------------------------------------- */
 int main()
 {
-  int number_cycles = 100000;                 // number of Monte-Carlo steps  //
-  int max_variations = 1;                    // max. var. params             //
+  int number_cycles = 1000000;                 // number of Monte-Carlo steps  //
+  int max_variations = 5;                     // max. var. params             //
   int thermalization = 10000;                 // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 2;                   // number of particles          //
-  double step_length= 1.0;                    // step length                  //
+  double step_length= 0.01;                    // step length                  //
   mat cumulative_e, cumulative_e2;            // energy-matrices              // 
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      // 
   int nx = 1;                                 // qu. num. for sing. particle  //
@@ -63,7 +63,7 @@ int main()
 
   ofile.open("vmc.dat");
   // ----------------------- MC sampling ------------------------------------ //
-#pragma omp parallel shared(cumulative_e, cumulative_e2) 
+#pragma omp parallel shared(cumulative_e_temp, cumulative_e2_temp)
   {
   cumulative_e_temp = mat(max_variations+1, max_variations+1);
   cumulative_e2_temp = mat(max_variations+1, max_variations+1);
@@ -101,10 +101,8 @@ void mc_sampling(int dimension, int number_particles, int charge,
   int cycles, variate, variate2, accept, i, j, thread;
   long idum;
   double alpha, beta, energy, energy2, delta_e, wfold, wfnew;
-  double D, timestep, greensfunction;
-  timestep = 0.01; // 0.1 - 0.001 
+  double D, greensfunction;
   D = 0.5; // 
-
   alpha = abegin*charge;
   idum=-1;
 
@@ -125,10 +123,11 @@ void mc_sampling(int dimension, int number_particles, int charge,
           //  initial trial position
           for (i = 0; i < number_particles; i++) {
             for (j = 0; j < dimension; j++) {
-              //r_old(i,j) = step_length*(ran1(&idum)-0.5);
-              r_old(i,j) = gaussian_deviate(&idum)*sqrt(timestep);
+//              r_old(i,j) = step_length*(ran1(&idum)-0.5);
+              r_old(i,j) = gaussian_deviate(&idum)*sqrt(step_length);
             }
           }
+
 
           /*SingleParticle particle_old(r_old, nx, dimension,\
                                           number_particles, omega);*/
@@ -147,9 +146,9 @@ void mc_sampling(int dimension, int number_particles, int charge,
             // new position
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
-               // r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
-                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*\
-                             sqrt(timestep) + qforce_old(i,j)*timestep*D;
+//                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
+                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*
+                             sqrt(step_length) + step_length*D*qforce_old(i,j);// 
               }
             }
 
@@ -170,14 +169,14 @@ void mc_sampling(int dimension, int number_particles, int charge,
             for (i = 0; i < number_particles; i++) {
                 for (j = 0; j < dimension; j++) {
                     greensfunction += 0.5*(qforce_old(i,j) - qforce_new(i,j))* \
-                          (D*timestep*0.5*(qforce_old(i,j) - qforce_new(i,j))- \
-                           r_new(i,j) + r_old(i,j));
+                       (D*step_length*0.5*(qforce_old(i,j) - qforce_new(i,j))- \
+                        r_new(i,j) + r_old(i,j));
                 }
             }
             greensfunction = exp(greensfunction);
 
             // ----------------- metropolis test ---------------------------- //
-            if (ran2(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
+            if (ran1(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
                 for (i = 0; i < number_particles; i++) {
                     for (j = 0; j < dimension; j++){
                         r_old(i,j) = r_new(i,j);
@@ -200,6 +199,10 @@ void mc_sampling(int dimension, int number_particles, int charge,
             }
           } 
           // ------------- end loop over monte carlo cycles ----------------- //    
+           
+          // update the energy average and its squared
+          cumulative_e(variate, variate2) = energy/number_cycles;
+          cumulative_e2(variate, variate2) = energy2/number_cycles;
 
 #pragma omp critical
           {
@@ -347,29 +350,6 @@ void output(int max_variations, int number_cycles, int charge,
   }
 } 
 
-// random numbers with gaussian distribution
-double gaussian_deviate(long * idum)
-{
-  static int iset = 0;
-  static double gset;
-  double fac, rsq, v1, v2;
-
-  if ( idum < 0) iset =0;
-  if (iset == 0) {
-    do {
-      v1 = 2.*ran2(idum) -1.0;
-      v2 = 2.*ran2(idum) -1.0;
-      rsq = v1*v1+v2*v2;
-    } while (rsq >= 1.0 || rsq == 0.);
-    fac = sqrt(-2.*log(rsq)/rsq);
-    gset = v1*fac;
-    iset = 1;
-    return v2*fac;
-  } else {
-    iset =0;
-    return gset;
-  }
-} // end function for gaussian deviates
 
 ///* -------------------------------------------------------------------------- *
 // *                    Random number generator                                 *

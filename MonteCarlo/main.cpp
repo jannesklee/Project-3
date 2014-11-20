@@ -20,8 +20,8 @@ ofstream ofile;
 // the step length and its squared inverse for the second derivative
 #define h 0.001
 #define h2 1000000
-#define abegin 0.7
-#define bbegin 0.1
+#define abegin 0.9
+#define bbegin 0.3
 #define astep 0.1
 #define bstep 0.1
 
@@ -44,50 +44,43 @@ double ran1(long *);
 int main()
 {
   int number_cycles = 100000;                 // number of Monte-Carlo steps  //
-  int max_variations = 5;                     // max. var. params             //
-  int thermalization = 1000000;               // Thermalization steps         //
+  int max_variations = 1;                    // max. var. params             //
+  int thermalization = 10000;                 // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 2;                   // number of particles          //
   double step_length= 1.0;                    // step length                  //
-  mat cumulative_e;                           // energy-matrix                // 
-  mat cumulative_e2;                          // energy-matrix (squared)      // 
-  __attribute__((unused)) int tid, nthreads;
-
+  mat cumulative_e, cumulative_e2;            // energy-matrices              // 
+  mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      // 
   int nx = 1;                                 // qu. num. for sing. particle  //
   double omega = 1;                           // freq. harm. osc.             //
-
-
+  int num_threads;                            // number of threads            // 
 
   cumulative_e = mat(max_variations+1, max_variations+1);
   cumulative_e2 = mat(max_variations+1, max_variations+1);
 
-//#pragma omp parallel private(nthreads, tid)
-//      {
-//      /* Obtain thread number */
-//      tid = omp_get_thread_num();
-//#pragma omp critical
-//      {
-//      cout << "Hello World from thread = " << tid << endl;
-//      }
-//
-//      /* Only master thread does this */
-//      if (tid == 0) 
-//      {
-//        nthreads = omp_get_num_threads();
-//#pragma omp critical
-//        {
-//        cout << "Number of threads = " << nthreads << endl;
-//        }
-//      }
-//
-//      }  /* All threads join master thread and disband */
-
   ofile.open("vmc.dat");
   // ----------------------- MC sampling ------------------------------------ //
+#pragma omp parallel shared(cumulative_e, cumulative_e2) 
+  {
+  cumulative_e_temp = mat(max_variations+1, max_variations+1);
+  cumulative_e2_temp = mat(max_variations+1, max_variations+1);
   mc_sampling(dimension, number_particles, charge, \
               max_variations, thermalization, number_cycles, \
-              step_length, cumulative_e, cumulative_e2, omega, nx);
+              step_length, cumulative_e_temp, cumulative_e2_temp, omega, nx);
+#pragma omp barrier
+#pragma omp critical
+  {
+      cumulative_e += cumulative_e_temp;
+      cumulative_e2 += cumulative_e2_temp;
+  }
+    num_threads = omp_get_num_threads();
+  }
+  cout << num_threads << endl;
+  cumulative_e = cumulative_e/num_threads;
+  cumulative_e2 = cumulative_e2/num_threads;
+  
+
   // ------------------------- Output --------------------------------------- // 
   output(max_variations, number_cycles, charge, cumulative_e, cumulative_e2);
   ofile.close();  // close output file
@@ -103,19 +96,16 @@ void mc_sampling(int dimension, int number_particles, int charge,
                  int thermalization, int number_cycles, double step_length,
                  mat &cumulative_e, mat &cumulative_e2, double omega, int nx){
   int cycles, variate, variate2, accept, i, j, thread;
-  __attribute__((unused)) int dim;
   long idum;
   double alpha, beta, energy, energy2, delta_e, wfold, wfnew;
   alpha = abegin*charge;
   idum=-1;
-
 
   // initial positions
   mat r_old = zeros<mat>(number_particles, dimension);
   mat r_new = zeros<mat>(number_particles, dimension);
    
   // -------------- Loop over different values of alpha, beta --------------- //
-//#pragma omp parallel for private(variate,variate2,i,j) reduction(+:energy,energy2,accept)
   for (variate = 1; variate <= max_variations; variate++){
       alpha += astep;
       beta = bbegin*charge;
@@ -136,20 +126,15 @@ void mc_sampling(int dimension, int number_particles, int charge,
           // clearify which wavefunction shall be used: perturbed or unperturbed
           wfold = particle_old.PerturbedWavefunction();
           // double wfold= particle_old.UnperturbedWavefunction();
-          
           // -------------- loop over monte carlo cycles -------------------- //
-//#pragma omp parallel for private(cycles,i,j)
           for (cycles = 1; cycles <= number_cycles+thermalization; cycles++){
             // new position
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
                 r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
-                thread = omp_get_thread_num();
-                {
-                  cout << "thread   " << thread << endl << "   rnew   " << r_new(i,j)<<endl;
-                } 
               }
             }
+
             /* SingleParticle particle_new(r_new, nx, dimension,\
                                             number_particles, omega);*/
             ManyBody particle_new(r_new, alpha, beta, dimension,\
@@ -178,18 +163,20 @@ void mc_sampling(int dimension, int number_particles, int charge,
               energy += delta_e;
               energy2 += delta_e*delta_e;
             }
-          }   
+          }
 
-//#pragma omp critical
+          // update the energy average and its squared
+          cumulative_e(variate, variate2) = energy/number_cycles;
+          cumulative_e2(variate, variate2) = energy2/number_cycles;
+
+#pragma omp critical 
           {
           cout << "alpha = " << alpha << setw(15)
                << "beta = " << beta << setw(20)
                << "accepted steps = " << accept << setw(20)
+               << "energy = " << cumulative_e(variate,variate2) << setw(20)
                << "thread = " << thread << endl;
-          // update the energy average and its squared
           }
-          cumulative_e(variate, variate2) = energy/number_cycles;
-          cumulative_e2(variate, variate2) = energy2/number_cycles;
       }
   }    // end of loop over variational  steps
 }   // end mc_sampling function
@@ -293,46 +280,3 @@ void output(int max_variations, int number_cycles, int charge,
       ofile << endl;
   }
 } 
-
-///* -------------------------------------------------------------------------- *
-// *                    Random number generator                                 *
-// * -------------------------------------------------------------------------- */
-//#define IA 16807
-//#define IM 2147483647
-//#define AM (1.0/IM)
-//#define IQ 127773
-//#define IR 2836
-//#define NTAB 32
-//#define NDIV (1+(IM-1)/NTAB)
-//#define EPS 1.2e-7
-//#define RNMX (1.0-EPS)
-//
-//double ran1(long *idum)
-//{
-//   int             j;
-//   long            k;
-//   static long     iy=0;
-//   static long     iv[NTAB];
-//   double          temp;
-//
-//   if (*idum <= 0 || !iy) {
-//      if (-(*idum) < 1) *idum=1;
-//      else *idum = -(*idum);
-//      for(j = NTAB + 7; j >= 0; j--) {
-//         k     = (*idum)/IQ;
-//         *idum = IA*(*idum - k*IQ) - IR*k;
-//         if(*idum < 0) *idum += IM;
-//         if(j < NTAB) iv[j] = *idum;
-//      }
-//      iy = iv[0];
-//   }
-//   k     = (*idum)/IQ;
-//   *idum = IA*(*idum - k*IQ) - IR*k;
-//   if(*idum < 0) *idum += IM;
-//   j     = iy/NDIV;
-//   iy    = iv[j];
-//   iv[j] = *idum;
-//   if((temp=AM*iy) > RNMX) return RNMX;
-//   else return temp;
-//}
-

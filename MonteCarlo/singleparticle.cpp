@@ -1,50 +1,61 @@
 #include "singleparticle.h"
 #include <armadillo>
 
+using namespace arma;
+
 double SingleParticle::Wavefunction()
 {
   int i, j;
-  double C;
-  double wf, argument, r_single_particle, hermite;
+  double C1, C2, wf, r_single_particle2, hermite1, hermite2;
 
-  wf = 0;
-  r_single_particle = 0;
-  for (i = 0; i < m_dimension; i++) {  // TODO: This has to be changed. Not reasonable
-    for (j = 0; j < m_dimension; j++) {
-      r_single_particle  += m_r(i,j)*m_r(i,j);
-    }
-  }
-  argument = sqrt(r_single_particle);
-
-  // Hermite polynomials and normalization factor C for n = 0,1,2
-  hermite = 0;
-  C = 1;
-  if (m_n==0){
-      hermite = 1;
-      C = 1*sqrt(sqrt(m_omega/M_PI));
-  }
-  if (m_n==1){
-      hermite = 2*sqrt(m_omega)*r_single_particle;
-      C = 0.5*sqrt(sqrt(m_omega/M_PI));
-  }
-  if (m_n==2){
-      hermite = 4*m_omega*r_single_particle*r_single_particle-2;
-      C = 1/8*sqrt(sqrt(m_omega/M_PI));
+  r_single_particle2 = 0;
+  for (j = 0; j < m_dimension; j++) {
+    r_single_particle2 += m_r(j) * m_r(j);
   }
 
+  // ------------------------ hermite's polynomials ------------------------- //
+  // for x-direction
+  if (m_nx==0){
+      hermite1 = 1.;
+      C1 = 1.*sqrt(sqrt(m_omega/M_PI));
+  }
+  if (m_nx==1){
+      hermite1 = 2.*sqrt(m_omega)*m_r(0);
+      C1 = 0.5*sqrt(sqrt(m_omega/M_PI));
+  }
+  if (m_nx==2){
+      hermite1 = 4.*m_omega*m_r(0)*m_r(0) - 2.;
+      C1 = 1./8.*sqrt(sqrt(m_omega/M_PI));
+  } 
+  // for y-direction
+  if (m_ny==0){
+      hermite2 = 1.;
+      C2 = 1.*sqrt(sqrt(m_omega/M_PI));
+  }
+  if (m_ny==1){
+      hermite2 = 2.*sqrt(m_omega)*m_r(1);
+      C2 = 0.5*sqrt(sqrt(m_omega/M_PI));
+  }
+  if (m_ny==2){
+      hermite2 = 4.*m_omega*m_r(1)*m_r(1) - 2.;
+      C2 = 1./8.*sqrt(sqrt(m_omega/M_PI));
+  }
 
-  //single particle wave function
-  wf = C*exp(-m_omega*argument*0.5)*hermite;
+  // -------------------- single particle wave function --------------------- //
+  wf = C1*C2*exp(-m_omega*r_single_particle2*0.5)*hermite1*hermite2;
   return wf;
 }
 
+void SingleParticle::SetPosition(vec r) {
+    m_r = r;
+}
 
-SingleParticle::SingleParticle(arma::mat r,int nx, int dimension, \
-        int number_particles, double omega)
+SingleParticle::SingleParticle(vec r,int nx, int ny, int dimension,\
+        double omega)
 {
     m_r = r;
-    m_n = nx;
+    m_nx = nx;
+    m_ny = ny;
     m_dimension = dimension;
-    m_number_particles = number_particles;
     m_omega = omega;
 }

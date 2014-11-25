@@ -106,13 +106,19 @@ double ManyBody::SixElectronSystem()
     //cout << r_12 << setw(15) << psi_c << endl;
 
     // spin-up particles
-    particle[0].SetAll(conv_to<vec>::from(m_r.row(0)), 0, 0, m_dimension, m_omega);
-    particle[2].SetAll(conv_to<vec>::from(m_r.row(0)), 1, 0, m_dimension, m_omega);
-    particle[4].SetAll(conv_to<vec>::from(m_r.row(0)), 0, 1, m_dimension, m_omega);
+    particle[0].SetAll(conv_to<vec>::from(m_r.row(0)), 0, 0, m_dimension,\
+            m_omega);
+    particle[2].SetAll(conv_to<vec>::from(m_r.row(0)), 1, 0, m_dimension,\
+            m_omega);
+    particle[4].SetAll(conv_to<vec>::from(m_r.row(0)), 0, 1, m_dimension,\
+            m_omega);
     // spin-down particles
-    particle[1].SetAll(conv_to<vec>::from(m_r.row(3)), 0, 0, m_dimension, m_omega);
-    particle[3].SetAll(conv_to<vec>::from(m_r.row(3)), 1, 0, m_dimension, m_omega);
-    particle[5].SetAll(conv_to<vec>::from(m_r.row(3)), 0, 1, m_dimension, m_omega);
+    particle[1].SetAll(conv_to<vec>::from(m_r.row(3)), 0, 0, m_dimension,\
+            m_omega);
+    particle[3].SetAll(conv_to<vec>::from(m_r.row(3)), 1, 0, m_dimension,\
+            m_omega);
+    particle[5].SetAll(conv_to<vec>::from(m_r.row(3)), 0, 1, m_dimension,\
+           m_omega);
 
     //cout << "-- setup particles" << endl;
 

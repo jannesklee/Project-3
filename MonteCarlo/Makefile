@@ -1,6 +1,6 @@
 CC = c++
 DEBUG = -g
-CFLAGS = -Wall -larmadillo -llapack -lblas -fopenmp $(DEBUG)
+CFLAGS = -Wall -larmadillo -llapack -lblas -fopenmp -O2 $(DEBUG)
 DEPS = singleparticle.h manybody.h lib.h
 OBJ = main.o singleparticle.o manybody.o lib.o
 

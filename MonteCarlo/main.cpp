@@ -20,8 +20,8 @@ ofstream ofile;
 // the step length and its squared inverse for the second derivative
 #define h 0.001
 #define h2 1000000
-#define abegin 0.95
-#define bbegin 0.35
+#define abegin 0.98
+#define bbegin 0.38
 #define astep 0.02
 #define bstep 0.02
 
@@ -47,14 +47,14 @@ int main()
 {
   int number_cycles = 100000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
-  int thermalization = 10000;                 // Thermalization steps         //
+  int thermalization = 0;                 // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 6;                   // number of particles          //
-  double step_length= 2.0;                   // step length                  //
+  double step_length= 0.1;                    // step length                  //
   mat cumulative_e, cumulative_e2;            // energy-matrices              // 
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      // 
-  double omega = 1.;                          // freq. harm. osc.             //
+  double omega = 1.0;                          // freq. harm. osc.             //
   int nx = 0;
   int num_threads;                            // number of threads            // 
 
@@ -62,6 +62,7 @@ int main()
   cumulative_e2 = mat(max_variations+1, max_variations+1);
 
   // ----------------------- MC sampling ------------------------------------ //
+omp_set_num_threads(1);
 #pragma omp parallel shared(cumulative_e_temp, cumulative_e2_temp)
   {
   cumulative_e_temp = mat(max_variations+1, max_variations+1);
@@ -123,8 +124,8 @@ void mc_sampling(int dimension, int number_particles, int charge,
           //  initial trial position
           for (i = 0; i < number_particles; i++) {
             for (j = 0; j < dimension; j++) {
-              r_old(i,j) = step_length*(ran1(&idum)-0.5);
-//              r_old(i,j) = gaussian_deviate(&idum)*sqrt(step_length);
+//              r_old(i,j) = step_length*(ran2(&idum)-0.5);
+              r_old(i,j) = gaussian_deviate(&idum);//*sqrt(step_length);
             }
           }
 
@@ -147,9 +148,9 @@ void mc_sampling(int dimension, int number_particles, int charge,
             // new position
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
-                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
-//                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*
-//                             sqrt(step_length) + step_length*D*qforce_old(i,j);// 
+//                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
+                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*
+                             sqrt(step_length) + step_length*D*qforce_old(i,j);// 
               }
             }
 
@@ -171,14 +172,13 @@ void mc_sampling(int dimension, int number_particles, int charge,
             greensfunction = 0.0;
             for (i = 0; i < number_particles; i++) {
                 for (j = 0; j < dimension; j++) {
-                    greensfunction += 0.5*(qforce_old(i,j) - qforce_new(i,j))* \
+                    greensfunction += 0.5*(qforce_old(i,j) + qforce_new(i,j))* \
                        (D*step_length*0.5*(qforce_old(i,j) - qforce_new(i,j))- \
                         r_new(i,j) + r_old(i,j));
                 }
             }
             greensfunction = exp(greensfunction);
 
-            greensfunction = 1.0;
             // ----------------- metropolis test ---------------------------- //
             if (ran1(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
                 for (i = 0; i < number_particles; i++) {
@@ -191,7 +191,6 @@ void mc_sampling(int dimension, int number_particles, int charge,
                 accept = accept + 1;
             }
 
-            thread = omp_get_thread_num();
 
             // ----------------- local energy ------------------------------- //
             if (cycles > thermalization) {
@@ -208,6 +207,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
           cumulative_e(variate, variate2) = energy/number_cycles;
           cumulative_e2(variate, variate2) = energy2/number_cycles;
 
+          thread = omp_get_thread_num();
 #pragma omp critical
           {
           cout << "alpha = " << alpha << setw(15)

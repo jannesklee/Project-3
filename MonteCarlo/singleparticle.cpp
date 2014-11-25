@@ -2,6 +2,7 @@
 #include <armadillo>
 
 using namespace arma;
+// TODO: in singleplarticle geht kein alpha ein
 
 double SingleParticle::Wavefunction()
 {

@@ -1,5 +1,4 @@
 // Variational Monte Carlo for atoms with up to two electrons
-
 #include <cmath>
 #include <iostream>
 #include <fstream>
@@ -9,11 +8,11 @@
 #include "singleparticle.h"  //class for single particles
 #include "manybody.h" //class for many-body problems
 #include <omp.h>
+#include <unittest++/UnitTest++.h>
 //#include <mpi.h>
 
 using namespace  std;
 using namespace arma;
-
 
 // output file as global variable
 ofstream ofile;
@@ -62,7 +61,7 @@ int main()
   cumulative_e2 = mat(max_variations+1, max_variations+1);
 
   // ----------------------- MC sampling ------------------------------------ //
-omp_set_num_threads(1);
+omp_set_num_threads(4);
 #pragma omp parallel shared(cumulative_e_temp, cumulative_e2_temp)
   {
   cumulative_e_temp = mat(max_variations+1, max_variations+1);
@@ -87,7 +86,11 @@ omp_set_num_threads(1);
   ofile.open("vmc.dat");
   output(max_variations, number_cycles, charge, cumulative_e, cumulative_e2);
   ofile.close();  // close output file
-  return 0;
+  
+
+  // ------------------------ unittests ------------------------------------- //
+  return UnitTest::RunAllTests();
+  //return 0;
 }
 
 
@@ -112,6 +115,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
   mat r_new = zeros<mat>(number_particles, dimension);
   mat qforce_old = zeros<mat>(number_particles, dimension);
   mat qforce_new = zeros<mat>(number_particles, dimension);
+  ManyBody system(dimension, number_particles, omega);
    
   // -------------- Loop over different values of alpha, beta --------------- //
   for (variate = 1; variate <= max_variations; variate++){
@@ -120,6 +124,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
       for (variate2 = 1; variate2 <= max_variations; variate2++){ 
           beta += bstep;
           energy = energy2 = 0; accept = 0; delta_e = 0;
+          system.SetVariables(alpha, beta);
 
           //  initial trial position
           for (i = 0; i < number_particles; i++) {
@@ -129,16 +134,10 @@ void mc_sampling(int dimension, int number_particles, int charge,
             }
           }
 
-
-          /*SingleParticle particle_old(r_old, nx, dimension,\
-                                          number_particles, omega);*/
-          ManyBody system_old(r_old, alpha, beta, dimension,\
-                                      number_particles, omega);
-         
-          // clearify which wavefunction shall be used: perturbed or unperturbed 
+          system.SetPosition(r_old);
+          wfold = system.SixElectronSystem();
           //wfold = particle_old.PerturbedWavefunction();
-          //wfold= particle_old.UnperturbedWavefunction();
-          wfold = system_old.SixElectronSystem();
+          //wfold = particle_old.UnperturbedWavefunction();
 
           quantum_force(number_particles, dimension, alpha, beta, omega, \
                   wfold, r_old, qforce_old);
@@ -149,20 +148,14 @@ void mc_sampling(int dimension, int number_particles, int charge,
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
 //                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
-                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*
-                             sqrt(step_length) + step_length*D*qforce_old(i,j);// 
+                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)* //sqrt(step_length)
+                             + step_length*D*qforce_old(i,j);// 
               }
             }
 
-            /* SingleParticle particle_new(r_new, nx, dimension,\
-                                            number_particles, omega);*/
-            ManyBody system_new(r_new, alpha, beta, dimension,\
-                                            number_particles, omega);
-
-            // clearify which wavefunction shall be used: perturbed or unpert.
+            system.SetPosition(r_new);
+            wfnew = system.SixElectronSystem();
             //wfnew = system_new.PerturbedWavefunction();
-            wfnew = system_new.SixElectronSystem();
-            //cout << wfnew << endl; 
             //wfnew= particle_new.UnperturbedWavefunction();
            
             quantum_force(number_particles, dimension, alpha, beta, omega,\
@@ -179,6 +172,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
             }
             greensfunction = exp(greensfunction);
 
+//            greensfunction = 1.;
             // ----------------- metropolis test ---------------------------- //
             if (ran1(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
                 for (i = 0; i < number_particles; i++) {
@@ -230,6 +224,7 @@ void quantum_force(int number_particles, int dimension, double alpha, \
 
     r_plus = zeros<mat>(number_particles,dimension);
     r_minus = zeros<mat>(number_particles,dimension);
+    ManyBody system(alpha, beta, dimension, number_particles, omega);
 
     for(i = 0 ; i < number_particles; i++) {
         for (j = 0; j < dimension ; j++) {
@@ -242,12 +237,10 @@ void quantum_force(int number_particles, int dimension, double alpha, \
         for (j = 0; j < dimension; j++){
             r_plus(i,j) = r(i,j) + h;
             r_minus(i,j) = r(i,j) - h; 
-            ManyBody particle_minus(r_minus, alpha, beta, dimension,\
-                                            number_particles, omega);
-            wfminus = particle_minus.SixElectronSystem();
-            ManyBody particle_plus(r_plus, alpha, beta, dimension,\
-                                            number_particles, omega);
-            wfplus = particle_plus.SixElectronSystem();
+            system.SetPosition(r_minus);
+            wfminus = system.SixElectronSystem();
+            system.SetPosition(r_plus);
+            wfplus = system.SixElectronSystem();
             qforce(i,j) = (wfplus - wfminus)/(wf*h);
             r_plus(i,j) = r(i,j);
             r_minus(i,j) = r(i,j);
@@ -259,12 +252,13 @@ void quantum_force(int number_particles, int dimension, double alpha, \
  *        Function to calculate the local energy with num derivative          *
  * -------------------------------------------------------------------------- */
 double  local_energy(mat r, double alpha, double beta, double wfold,\
-            int dimension, int number_particles, int charge, double omega, int nx)
+          int dimension, int number_particles, int charge, double omega, int nx)
 {
   int i, j , k;
   double e_local, e_kinetic, e_potential, r_12, r_single_particle;
   double wfminus, wfplus;
   mat r_plus,r_minus;
+  ManyBody system(r_minus, alpha, beta, dimension, number_particles, omega);
 
   // allocate matrices which contain the position of the particles
   // the function matrix is defined in the progam library
@@ -282,18 +276,12 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
     for (j = 0; j < dimension; j++) {
       r_plus(i,j) = r(i,j) + h;
       r_minus(i,j) = r(i,j) - h;
-      // SingleParticle particle_minus(r_minus, nx, dimension,
-      //                                number_particles, omega);
-      ManyBody particle_minus(r_minus, alpha, beta, dimension,\
-                              number_particles, omega);
-      wfminus= particle_minus.SixElectronSystem();
-      // double wfminus= particle_minus.UnperturbedWavefunction();
-      // SingleParticle particle_plus(r_plus, nx, dimension,
-      //                                number_particles, omega);
-      ManyBody particle_plus(r_plus, alpha, beta, dimension,\
-                                           number_particles, omega);
-      wfplus= particle_plus.SixElectronSystem();
-      // double wfplus= particle_plus.UnperturbedWavefunction();
+
+      system.SetPosition(r_minus);
+      wfminus = system.SixElectronSystem();
+      system.SetPosition(r_plus);
+      wfplus= system.SixElectronSystem();
+      
       e_kinetic -= (wfminus + wfplus - 2*wfold);
       r_plus(i,j) = r(i,j);
       r_minus(i,j) = r(i,j);
@@ -353,47 +341,3 @@ void output(int max_variations, int number_cycles, int charge,
       ofile << endl;
   }
 } 
-
-
-///* -------------------------------------------------------------------------- *
-// *                    Random number generator                                 *
-// * -------------------------------------------------------------------------- */
-//#define IA 16807
-//#define IM 2147483647
-//#define AM (1.0/IM)
-//#define IQ 127773
-//#define IR 2836
-//#define NTAB 32
-//#define NDIV (1+(IM-1)/NTAB)
-//#define EPS 1.2e-7
-//#define RNMX (1.0-EPS)
-//
-//double ran1(long *idum)
-//{
-//   int             j;
-//   long            k;
-//   static long     iy=0;
-//   static long     iv[NTAB];
-//   double          temp;
-//
-//   if (*idum <= 0 || !iy) {
-//      if (-(*idum) < 1) *idum=1;
-//      else *idum = -(*idum);
-//      for(j = NTAB + 7; j >= 0; j--) {
-//         k     = (*idum)/IQ;
-//         *idum = IA*(*idum - k*IQ) - IR*k;
-//         if(*idum < 0) *idum += IM;
-//         if(j < NTAB) iv[j] = *idum;
-//      }
-//      iy = iv[0];
-//   }
-//   k     = (*idum)/IQ;
-//   *idum = IA*(*idum - k*IQ) - IR*k;
-//   if(*idum < 0) *idum += IM;
-//   j     = iy/NDIV;
-//   iy    = iv[j];
-//   iv[j] = *idum;
-//   if((temp=AM*iy) > RNMX) return RNMX;
-//   else return temp;
-//}
-

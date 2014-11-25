@@ -13,10 +13,15 @@ class ManyBody
     public:
         ManyBody(mat r, double alpha, double beta, int dimension, \
                        int number_particles, double omega);
+        ManyBody(double alpha, double beta, int dimension, \
+                       int number_particles, double omega);
+        ManyBody(int dimension, int number_particles, double omega);
+        ManyBody();
         double PerturbedWavefunction();
         double UnperturbedWavefunction();
         double SixElectronSystem();
         void SetPosition(mat r);
+        void SetVariables(double alpha, double beta);
 };
 
 #endif // MANYBODY_H

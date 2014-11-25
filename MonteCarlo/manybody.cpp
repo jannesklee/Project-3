@@ -125,9 +125,11 @@ double ManyBody::SixElectronSystem()
     // filling of slater matrix
     for (i = 0; i < red_slater_size; i++) {
         for (j = 0; j < red_slater_size; j++) {
-            particle[i*2].SetPosition(conv_to<vec>::from(m_r.row(j))); // spin_up
+            // spin up
+            particle[i*2].SetPosition(conv_to<vec>::from(m_r.row(j))); 
             slater_up(i,j) = particle[i*2].Wavefunction();
-            particle[i*2+1].SetPosition(conv_to<vec>::from(m_r.row(j+3))); // spin_down
+            // spin down
+            particle[i*2+1].SetPosition(conv_to<vec>::from(m_r.row(j+3))); 
             slater_down(i,j) = particle[i*2+1].Wavefunction();
         }
     }
@@ -150,18 +152,46 @@ double ManyBody::SixElectronSystem()
     //cout << "-- calculated determinant" << endl;
     //cout << det_slater_up << setw(15) << det_slater_down << endl;
 
-    // ---------------------- calculate wavefunction ----------------------- //
+    // ---------------------- calculate wavefunction ------------------------ //
     wf = det_slater_up*det_slater_down*psi_c;
     //cout << "wavefunction = " << wf << endl;
     return wf;
 }
 
+// ------------------------ setters, getters -------------------------------- //
 void ManyBody::SetPosition(mat r) {
     m_r = r;
 }
 
+void ManyBody::SetVariables(double alpha, double beta) {
+    m_alpha = alpha;
+    m_beta = beta;
+}
 
-ManyBody::ManyBody(mat r, double alpha, double beta, int dimension, int number_particles, double omega)
+// ------------------------- constructors ----------------------------------- //
+ManyBody::ManyBody()
+{
+}
+
+ManyBody::ManyBody(int dimension, int number_particles, double omega)
+{
+    m_dimension = dimension;
+    m_number_particles = number_particles;
+    m_omega = omega;
+}
+
+ManyBody::ManyBody(double alpha, double beta, int dimension, \
+        int number_particles, double omega)
+{
+    m_alpha = alpha;
+    m_beta = beta;
+    m_dimension = dimension;
+    m_number_particles = number_particles;
+    m_omega = omega;
+}
+
+ManyBody::ManyBody(mat r, double alpha, double beta, int dimension, \
+        int number_particles, double omega)
 {
     m_r = r;
     m_alpha = alpha;

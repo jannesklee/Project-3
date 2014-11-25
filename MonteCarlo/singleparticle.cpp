@@ -5,12 +5,12 @@ using namespace arma;
 
 double SingleParticle::Wavefunction()
 {
-  int i, j;
+  int i;
   double C1, C2, wf, r_single_particle2, hermite1, hermite2;
 
   r_single_particle2 = 0;
-  for (j = 0; j < m_dimension; j++) {
-    r_single_particle2 += m_r(j) * m_r(j);
+  for (i = 0; i < m_dimension; i++) {
+    r_single_particle2 += m_r(i) * m_r(i);
   }
 
   // ------------------------ hermite's polynomials ------------------------- //
@@ -50,6 +50,16 @@ void SingleParticle::SetPosition(vec r) {
     m_r = r;
 }
 
+void SingleParticle::SetAll(vec r, int nx, int ny, int dimension, double omega)
+{
+    m_r = r;
+    m_nx = nx;
+    m_ny = ny;
+    m_dimension = dimension;
+    m_omega = omega;
+}
+
+// constructor 
 SingleParticle::SingleParticle(vec r,int nx, int ny, int dimension,\
         double omega)
 {
@@ -58,4 +68,14 @@ SingleParticle::SingleParticle(vec r,int nx, int ny, int dimension,\
     m_ny = ny;
     m_dimension = dimension;
     m_omega = omega;
+}
+
+// default constructor
+SingleParticle::SingleParticle()
+{
+    m_r = 1.0;
+    m_nx = 0;
+    m_ny = 0;
+    m_dimension = 2;
+    m_omega = 1.0;
 }

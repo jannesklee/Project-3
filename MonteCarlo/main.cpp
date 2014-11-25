@@ -20,10 +20,10 @@ ofstream ofile;
 // the step length and its squared inverse for the second derivative
 #define h 0.001
 #define h2 1000000
-#define abegin 0.7
-#define bbegin 0.0
-#define astep 0.1
-#define bstep 0.1
+#define abegin 0.95
+#define bbegin 0.35
+#define astep 0.02
+#define bstep 0.02
 
 /* -------------------------------------------------------------------------- *
  *                        Declaration of functions                            *
@@ -45,23 +45,22 @@ double gaussian_deviate(long *);
  * -------------------------------------------------------------------------- */
 int main()
 {
-  int number_cycles = 1000000;                 // number of Monte-Carlo steps  //
+  int number_cycles = 100000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
   int thermalization = 10000;                 // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
-  int number_particles = 2;                   // number of particles          //
-  double step_length= 0.01;                    // step length                  //
+  int number_particles = 6;                   // number of particles          //
+  double step_length= 2.0;                   // step length                  //
   mat cumulative_e, cumulative_e2;            // energy-matrices              // 
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      // 
-  int nx = 1;                                 // qu. num. for sing. particle  //
-  double omega = 1;                           // freq. harm. osc.             //
+  double omega = 1.;                          // freq. harm. osc.             //
+  int nx = 0;
   int num_threads;                            // number of threads            // 
 
   cumulative_e = mat(max_variations+1, max_variations+1);
   cumulative_e2 = mat(max_variations+1, max_variations+1);
 
-  ofile.open("vmc.dat");
   // ----------------------- MC sampling ------------------------------------ //
 #pragma omp parallel shared(cumulative_e_temp, cumulative_e2_temp)
   {
@@ -73,8 +72,8 @@ int main()
 #pragma omp barrier
 #pragma omp critical
   {
-      cumulative_e += cumulative_e_temp;
-      cumulative_e2 += cumulative_e2_temp;
+    cumulative_e += cumulative_e_temp;
+    cumulative_e2 += cumulative_e2_temp;
   }
     num_threads = omp_get_num_threads();
   }
@@ -84,6 +83,7 @@ int main()
   
 
   // ------------------------- Output --------------------------------------- // 
+  ofile.open("vmc.dat");
   output(max_variations, number_cycles, charge, cumulative_e, cumulative_e2);
   ofile.close();  // close output file
   return 0;
@@ -123,20 +123,21 @@ void mc_sampling(int dimension, int number_particles, int charge,
           //  initial trial position
           for (i = 0; i < number_particles; i++) {
             for (j = 0; j < dimension; j++) {
-//              r_old(i,j) = step_length*(ran1(&idum)-0.5);
-              r_old(i,j) = gaussian_deviate(&idum)*sqrt(step_length);
+              r_old(i,j) = step_length*(ran1(&idum)-0.5);
+//              r_old(i,j) = gaussian_deviate(&idum)*sqrt(step_length);
             }
           }
 
 
           /*SingleParticle particle_old(r_old, nx, dimension,\
                                           number_particles, omega);*/
-          ManyBody particle_old(r_old, alpha, beta, dimension,\
+          ManyBody system_old(r_old, alpha, beta, dimension,\
                                       number_particles, omega);
          
           // clearify which wavefunction shall be used: perturbed or unperturbed 
-          wfold = particle_old.PerturbedWavefunction();
+          //wfold = particle_old.PerturbedWavefunction();
           //wfold= particle_old.UnperturbedWavefunction();
+          wfold = system_old.SixElectronSystem();
 
           quantum_force(number_particles, dimension, alpha, beta, omega, \
                   wfold, r_old, qforce_old);
@@ -146,19 +147,21 @@ void mc_sampling(int dimension, int number_particles, int charge,
             // new position
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
-//                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
-                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*
-                             sqrt(step_length) + step_length*D*qforce_old(i,j);// 
+                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
+//                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*
+//                             sqrt(step_length) + step_length*D*qforce_old(i,j);// 
               }
             }
 
             /* SingleParticle particle_new(r_new, nx, dimension,\
                                             number_particles, omega);*/
-            ManyBody particle_new(r_new, alpha, beta, dimension,\
+            ManyBody system_new(r_new, alpha, beta, dimension,\
                                             number_particles, omega);
 
             // clearify which wavefunction shall be used: perturbed or unpert.
-            wfnew = particle_new.PerturbedWavefunction();
+            //wfnew = system_new.PerturbedWavefunction();
+            wfnew = system_new.SixElectronSystem();
+            //cout << wfnew << endl; 
             //wfnew= particle_new.UnperturbedWavefunction();
            
             quantum_force(number_particles, dimension, alpha, beta, omega,\
@@ -175,6 +178,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
             }
             greensfunction = exp(greensfunction);
 
+            greensfunction = 1.0;
             // ----------------- metropolis test ---------------------------- //
             if (ran1(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
                 for (i = 0; i < number_particles; i++) {
@@ -240,10 +244,10 @@ void quantum_force(int number_particles, int dimension, double alpha, \
             r_minus(i,j) = r(i,j) - h; 
             ManyBody particle_minus(r_minus, alpha, beta, dimension,\
                                             number_particles, omega);
-            wfminus = particle_minus.PerturbedWavefunction();
+            wfminus = particle_minus.SixElectronSystem();
             ManyBody particle_plus(r_plus, alpha, beta, dimension,\
                                             number_particles, omega);
-            wfplus = particle_plus.PerturbedWavefunction();
+            wfplus = particle_plus.SixElectronSystem();
             qforce(i,j) = (wfplus - wfminus)/(wf*h);
             r_plus(i,j) = r(i,j);
             r_minus(i,j) = r(i,j);
@@ -258,8 +262,8 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
             int dimension, int number_particles, int charge, double omega, int nx)
 {
   int i, j , k;
-  double e_local, e_kinetic, e_potential, r_12, \
-    r_single_particle, wfminus, wfplus;
+  double e_local, e_kinetic, e_potential, r_12, r_single_particle;
+  double wfminus, wfplus;
   mat r_plus,r_minus;
 
   // allocate matrices which contain the position of the particles
@@ -272,7 +276,7 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
     }
   }
 
-  // compute the kinetic energy
+  // ---------------------- kinetic energy ---------------------------------- //
   e_kinetic = 0;
   for (i = 0; i < number_particles; i++) {
     for (j = 0; j < dimension; j++) {
@@ -282,13 +286,13 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
       //                                number_particles, omega);
       ManyBody particle_minus(r_minus, alpha, beta, dimension,\
                               number_particles, omega);
-      wfminus= particle_minus.PerturbedWavefunction();
+      wfminus= particle_minus.SixElectronSystem();
       // double wfminus= particle_minus.UnperturbedWavefunction();
       // SingleParticle particle_plus(r_plus, nx, dimension,
       //                                number_particles, omega);
       ManyBody particle_plus(r_plus, alpha, beta, dimension,\
                                            number_particles, omega);
-      wfplus= particle_plus.PerturbedWavefunction();
+      wfplus= particle_plus.SixElectronSystem();
       // double wfplus= particle_plus.UnperturbedWavefunction();
       e_kinetic -= (wfminus + wfplus - 2*wfold);
       r_plus(i,j) = r(i,j);
@@ -298,7 +302,7 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
   // include electron mass and hbar squared and divide by wave function
   e_kinetic = 0.5*h2*e_kinetic/wfold;
 
-  // compute the potential energy
+  // ---------------------- potential energy -------------------------------- //
   e_potential = 0;
   // contribution from electron-proton potential
   for (i = 0; i < number_particles; i++) {
@@ -306,8 +310,7 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
     for (j = 0; j < dimension; j++) {
       r_single_particle += r(i,j)*r(i,j);
     }
-//    e_potential -= charge/sqrt(r_single_particle);
-    e_potential += 0.5*r_single_particle; // TODO: OMEGA IS MISSING HERE! 
+    e_potential += 0.5*omega*omega*r_single_particle; 
   }
   // contribution from electron-electron potential  
   for (i = 0; i < number_particles-1; i++) {
@@ -320,6 +323,7 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
     }
   }
 
+  // -------------------------- total energy -------------------------------- //
   e_local = e_potential + e_kinetic;
   return e_local;
 }

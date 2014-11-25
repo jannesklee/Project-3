@@ -12,7 +12,9 @@ class SingleParticle
         double m_omega;
     public:
         SingleParticle(vec r, int nx, int ny, int dimension, double omega);
+        SingleParticle();
         void SetPosition(vec r);
+        void SetAll(vec r, int nx, int ny, int dimension, double omega);
         double Wavefunction();
 };
 

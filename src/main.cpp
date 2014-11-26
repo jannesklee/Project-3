@@ -28,10 +28,9 @@ ofstream ofile;
  *                        Declaration of functions                            *
  * -------------------------------------------------------------------------- */
 // The Mc sampling for the variational Monte Carlo
-void  mc_sampling(int, int, int, int, int, int, double, mat &, mat &, double,\
-        int);
+void  mc_sampling(int, int, int, int, int, int, double, mat &, mat &, double);
 // The local energy
-double  local_energy(mat, double, double, double, int, int, int, double, int);
+double  local_energy(mat, double, double, double, int, int, int, double);
 // prints to screen the results of the calculations
 void  output(int, int, int, mat, mat);
 // quantum force for importance sampling
@@ -46,15 +45,14 @@ int main()
 {
   int number_cycles = 100000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
-  int thermalization = 0;                 // Thermalization steps         //
+  int thermalization = 0;                     // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 6;                   // number of particles          //
   double step_length= 0.1;                    // step length                  //
   mat cumulative_e, cumulative_e2;            // energy-matrices              // 
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      // 
-  double omega = 1.0;                          // freq. harm. osc.             //
-  int nx = 0;
+  double omega = 1.0;                         // freq. harm. osc.             //
   int num_threads;                            // number of threads            // 
 
   cumulative_e = mat(max_variations+1, max_variations+1);
@@ -68,7 +66,7 @@ omp_set_num_threads(4);
   cumulative_e2_temp = mat(max_variations+1, max_variations+1);
   mc_sampling(dimension, number_particles, charge, \
               max_variations, thermalization, number_cycles, \
-              step_length, cumulative_e_temp, cumulative_e2_temp, omega, nx);
+              step_length, cumulative_e_temp, cumulative_e2_temp, omega);
 #pragma omp barrier
 #pragma omp critical
   {
@@ -89,8 +87,8 @@ omp_set_num_threads(4);
   
 
   // ------------------------ unittests ------------------------------------- //
-  return UnitTest::RunAllTests();
-  //return 0;
+  //return UnitTest::RunAllTests();
+  return 0;
 }
 
 
@@ -100,7 +98,7 @@ omp_set_num_threads(4);
 void mc_sampling(int dimension, int number_particles, int charge,
                  int max_variations,
                  int thermalization, int number_cycles, double step_length,
-                 mat &cumulative_e, mat &cumulative_e2, double omega, int nx){
+                 mat &cumulative_e, mat &cumulative_e2, double omega){
 
   int cycles, variate, variate2, accept, i, j, thread;
   long idum;
@@ -189,7 +187,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
             // ----------------- local energy ------------------------------- //
             if (cycles > thermalization) {
               delta_e = local_energy(r_old, alpha, beta, wfold, dimension,
-                                     number_particles, charge, omega, nx);
+                                     number_particles, charge, omega);
               // update energies
               energy += delta_e;
               energy2 += delta_e*delta_e;
@@ -252,11 +250,12 @@ void quantum_force(int number_particles, int dimension, double alpha, \
  *        Function to calculate the local energy with num derivative          *
  * -------------------------------------------------------------------------- */
 double  local_energy(mat r, double alpha, double beta, double wfold,\
-          int dimension, int number_particles, int charge, double omega, int nx)
+          int dimension, int number_particles, int charge, double omega)
 {
   int i, j , k;
   double e_local, e_kinetic, e_potential, r_12, r_single_particle;
   double wfminus, wfplus;
+  (void) charge;
   mat r_plus,r_minus;
   ManyBody system(r_minus, alpha, beta, dimension, number_particles, omega);
 
@@ -318,8 +317,8 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
 
 
 // output function
-void output(int max_variations, int number_cycles, int charge,
-            mat cumulative_e, mat cumulative_e2)
+void output(int max_variations, int number_cycles, int charge, \
+        mat cumulative_e, mat cumulative_e2)
 {
   int i, j;
   double alpha, beta, variance, error;

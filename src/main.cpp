@@ -100,7 +100,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
                  int thermalization, int number_cycles, double step_length,
                  mat &cumulative_e, mat &cumulative_e2, double omega){
 
-  int cycles, variate, variate2, accept, i, j, thread;
+  int cycles, variate, variate2, accept, i, j, k, thread;
   long idum;
   double alpha, beta, energy, energy2, delta_e, wfold, wfnew;
   double D, greensfunction;
@@ -150,39 +150,44 @@ void mc_sampling(int dimension, int number_particles, int charge,
                              + step_length*D*qforce_old(i,j);// 
               }
             }
+              
+              // we move only one particle at the time
+              for (k = 0; k < number_particles; k++) {
+                  if (k != i) { 
+                      for (j = 0; j < dimension; j++) {  // resets all elements to old
+                          r_new(i,j) = r_old(k,j);
+                      }
+                  }
+              }
+              // wavefunction_one_move(r_new, qforce_new, &wfnew, beta)
 
-            system.SetPosition(r_new);
-            wfnew = system.SixElectronSystem();
-            //wfnew = system_new.PerturbedWavefunction();
-            //wfnew= particle_new.UnperturbedWavefunction();
-           
-            quantum_force(number_particles, dimension, alpha, beta, omega,\
-                    wfnew, r_new, qforce_new);
-            
-            // ------------------ greensfunction ---------------------------- //
-            greensfunction = 0.0;
-            for (i = 0; i < number_particles; i++) {
-                for (j = 0; j < dimension; j++) {
-                    greensfunction += 0.5*(qforce_old(i,j) + qforce_new(i,j))* \
-                       (D*step_length*0.5*(qforce_old(i,j) - qforce_new(i,j))- \
-                        r_new(i,j) + r_old(i,j));
-                }
-            }
-            greensfunction = exp(greensfunction);
+              system.SetPosition(r_new);
+              wfnew = system.SixElectronSystem();
+              //wfnew = system_new.PerturbedWavefunction();
+              //wfnew= particle_new.UnperturbedWavefunction();
+              
+              quantum_force(number_particles, dimension, alpha, beta, omega,\
+                      wfnew, r_new, qforce_new);
+              
+              // ------------------ greensfunction ---------------------------- //
+              greensfunction = 0.0;
+              for (j = 0; j < dimension; j++) {
+                  greensfunction += 0.5*(qforce_old(i,j) + qforce_new(i,j))* \
+                     (D*step_length*0.5*(qforce_old(i,j) - qforce_new(i,j))- \
+                      r_new(i,j) + r_old(i,j));
+              }
+              greensfunction = exp(greensfunction);
 
 //            greensfunction = 1.;
-            // ----------------- metropolis test ---------------------------- //
-            if (ran1(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
-                for (i = 0; i < number_particles; i++) {
-                    for (j = 0; j < dimension; j++){
-                        r_old(i,j) = r_new(i,j);
-                        qforce_old(i,j) = qforce_new(i,j); 
-                    }
-                }
-                wfold = wfnew;
-                accept = accept + 1;
-            }
-
+              // ----------------- metropolis test ---------------------------- //
+              if (ran2(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
+                  for (j = 0; j < dimension; j++){
+                      r_old(i,j) = r_new(i,j);
+                      qforce_old(i,j) = qforce_new(i,j); 
+                  }
+              wfold = wfnew;
+              accept = accept + 1;
+              }
 
             // ----------------- local energy ------------------------------- //
             if (cycles > thermalization) {

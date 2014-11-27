@@ -279,9 +279,9 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
       system.SetPosition(r_minus);
       wfminus = system.SixElectronSystem();
       system.SetPosition(r_plus);
-      wfplus= system.SixElectronSystem();
+      wfplus = system.SixElectronSystem();
       
-      e_kinetic -= (wfminus + wfplus - 2*wfold);
+      e_kinetic -= (wfminus + wfplus - 2.*wfold);
       r_plus(i,j) = r(i,j);
       r_minus(i,j) = r(i,j);
     }

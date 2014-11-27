@@ -38,7 +38,7 @@ double SingleParticle::Wavefunction()
   }
 
   // -------------------- single particle wave function --------------------- //
-  wf = exp(-m_omega*r_single_particle2*0.5)*hermite1*hermite2;
+  wf = exp(-m_omega*m_alpha*r_single_particle2*0.5)*hermite1*hermite2;
   return wf;
 }
 
@@ -46,24 +46,27 @@ void SingleParticle::SetPosition(vec r) {
     m_r = r;
 }
 
-void SingleParticle::SetAll(vec r, int nx, int ny, int dimension, double omega)
+void SingleParticle::SetAll(vec r, int nx, int ny, int dimension, double omega,\
+        double alpha)
 {
     m_r = r;
     m_nx = nx;
     m_ny = ny;
     m_dimension = dimension;
     m_omega = omega;
+    m_alpha = alpha; 
 }
 
 // constructor 
 SingleParticle::SingleParticle(vec r,int nx, int ny, int dimension,\
-        double omega)
+        double omega, double alpha)
 {
     m_r = r;
     m_nx = nx;
     m_ny = ny;
     m_dimension = dimension;
     m_omega = omega;
+    m_alpha = alpha; 
 }
 
 // default constructor
@@ -74,4 +77,5 @@ SingleParticle::SingleParticle()
     m_ny = 0;
     m_dimension = 2;
     m_omega = 1.0;
+    m_alpha = 1.0; 
 }

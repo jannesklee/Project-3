@@ -9,12 +9,14 @@ class SingleParticle
     protected:
         vec m_r;
         int m_nx, m_ny, m_dimension;
-        double m_omega;
+        double m_omega, m_alpha;
     public:
-        SingleParticle(vec r, int nx, int ny, int dimension, double omega);
+        SingleParticle(vec r, int nx, int ny, int dimension, double omega,\
+                double alpha);
         SingleParticle();
         void SetPosition(vec r);
-        void SetAll(vec r, int nx, int ny, int dimension, double omega);
+        void SetAll(vec r, int nx, int ny, int dimension, double omega,\
+                double alpha);
         double Wavefunction();
 };
 

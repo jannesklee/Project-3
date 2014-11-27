@@ -54,7 +54,13 @@ double ManyBody::PerturbedWavefunction()
   return wf;
 }
 
-
+//!\brief trial wave function for six electron system
+ 
+//! SixElectronSystem calculates the trial wave function in two steps. The first
+//! one consists of the calculation of the Jastrow-factor, the second the unpur-
+//! turbed part of the wavefunction. The latter thereby fills in two slater 
+//! determinants for either spin up or spin down particles and evaluates the
+//! determinant applying Sarrus' rule.
 double ManyBody::SixElectronSystem()
 {
     // TODO: the matrix m_r is not coupled to the vecotrs m_r in singleparticle
@@ -71,6 +77,7 @@ double ManyBody::SixElectronSystem()
     slater_up = mat(red_slater_size, red_slater_size);  
     slater_down = mat(red_slater_size, red_slater_size);
 
+    // ----------------------- Pade-Jastrow factor -------------------------- //
     // calculates the absolute position
     argument = wf = 0;
     for (i = 0; i < m_number_particles; i++) {
@@ -105,20 +112,21 @@ double ManyBody::SixElectronSystem()
     //cout << "-- calculated relative distances" << endl;
     //cout << r_12 << setw(15) << psi_c << endl;
 
+    // ------------------------ Unpurturbed part ---------------------------- //
     // spin-up particles
     particle[0].SetAll(conv_to<vec>::from(m_r.row(0)), 0, 0, m_dimension,\
-            m_omega);
+            m_omega, m_alpha);
     particle[2].SetAll(conv_to<vec>::from(m_r.row(0)), 1, 0, m_dimension,\
-            m_omega);
+            m_omega, m_alpha);
     particle[4].SetAll(conv_to<vec>::from(m_r.row(0)), 0, 1, m_dimension,\
-            m_omega);
+            m_omega, m_alpha);
     // spin-down particles
     particle[1].SetAll(conv_to<vec>::from(m_r.row(3)), 0, 0, m_dimension,\
-            m_omega);
+            m_omega, m_alpha);
     particle[3].SetAll(conv_to<vec>::from(m_r.row(3)), 1, 0, m_dimension,\
-            m_omega);
+            m_omega, m_alpha);
     particle[5].SetAll(conv_to<vec>::from(m_r.row(3)), 0, 1, m_dimension,\
-           m_omega);
+            m_omega, m_alpha);
 
     //cout << "-- setup particles" << endl;
 

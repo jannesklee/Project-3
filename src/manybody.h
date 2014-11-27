@@ -3,7 +3,11 @@
 #include <armadillo>
 
 using namespace arma;
+//! The ManyBody class
 
+//! Sets up a system of the multiply particles. Yet implemented are perturbed
+//! and unperturbed wave function for two electron systems and a purturbed
+//! version for a one electron system 
 class ManyBody
 {
     protected:
@@ -11,12 +15,12 @@ class ManyBody
         double m_alpha, m_beta, m_omega;
         int m_dimension, m_number_particles;
     public:
+        ManyBody();
         ManyBody(mat r, double alpha, double beta, int dimension, \
                        int number_particles, double omega);
         ManyBody(double alpha, double beta, int dimension, \
                        int number_particles, double omega);
         ManyBody(int dimension, int number_particles, double omega);
-        ManyBody();
         double PerturbedWavefunction();
         double UnperturbedWavefunction();
         double SixElectronSystem();

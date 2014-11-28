@@ -21,20 +21,20 @@ double SingleParticle::Wavefunction()
       hermite1 = 1.;
   }
   if (m_nx==1){
-      hermite1 = 2.*sqrt(m_omega)*m_r(0);
+      hermite1 = 2.*sqrt(m_alpha*m_omega)*m_r(0);
   }
   if (m_nx==2){
-      hermite1 = 4.*m_omega*m_r(0)*m_r(0) - 2.;
+      hermite1 = 4.*m_alpha*m_omega*m_r(0)*m_r(0) - 2.;
   } 
   // for y-direction
   if (m_ny==0){
       hermite2 = 1.;
   }
   if (m_ny==1){
-      hermite2 = 2.*sqrt(m_omega)*m_r(1);
+      hermite2 = 2.*sqrt(m_alpha*m_omega)*m_r(1);
   }
   if (m_ny==2){
-      hermite2 = 4.*m_omega*m_r(1)*m_r(1) - 2.;
+      hermite2 = 4.*m_alpha*m_omega*m_r(1)*m_r(1) - 2.;
   }
 
   // -------------------- single particle wave function --------------------- //

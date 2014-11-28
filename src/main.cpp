@@ -127,8 +127,8 @@ void mc_sampling(int dimension, int number_particles, int charge,
           //  initial trial position
           for (i = 0; i < number_particles; i++) {
             for (j = 0; j < dimension; j++) {
-//              r_old(i,j) = step_length*(ran2(&idum)-0.5);
-              r_old(i,j) = gaussian_deviate(&idum);//*sqrt(step_length);
+              r_old(i,j) = step_length*(ran2(&idum)-0.5);
+//              r_old(i,j) = gaussian_deviate(&idum);//*sqrt(step_length);
             }
           }
 
@@ -145,11 +145,10 @@ void mc_sampling(int dimension, int number_particles, int charge,
             // new position
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
-//                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
-                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)* //sqrt(step_length)
-                             + step_length*D*qforce_old(i,j);// 
+                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
+//                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)* //sqrt(step_length)
+//                             + step_length*D*qforce_old(i,j);// 
               }
-            }
               
               // we move only one particle at the time
               for (k = 0; k < number_particles; k++) {
@@ -178,7 +177,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
               }
               greensfunction = exp(greensfunction);
 
-//            greensfunction = 1.;
+            greensfunction = 1.;
               // ----------------- metropolis test ---------------------------- //
               if (ran2(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
                   for (j = 0; j < dimension; j++){
@@ -188,6 +187,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
               wfold = wfnew;
               accept = accept + 1;
               }
+            }
 
             // ----------------- local energy ------------------------------- //
             if (cycles > thermalization) {

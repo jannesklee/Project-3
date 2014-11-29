@@ -40,9 +40,9 @@ double ManyBody::PerturbedWavefunction()
   }
 
   // calculates the relative distance // TODO: At that point too much calculation (loop)
+  r_12 = 0;
   for (i = 0; i < m_number_particles-1; i++) { 
     for (j = i+1; j < m_number_particles; j++) {
-      r_12 = 0;
       for (k = 0; k < m_dimension; k++) {
         r_12 += (m_r(i,k)-m_r(j,k))*(m_r(i,k)-m_r(j,k));
       }
@@ -98,13 +98,13 @@ double ManyBody::SixElectronSystem()
             for (k = 0; k < m_dimension; k++) {
                 r_12 += (m_r(i,k)-m_r(j,k))*(m_r(i,k)-m_r(j,k));
             }
-                // evaluate a for parallel or antiparallel spin
-                if ((i+j)%2 == 0) { 
-                    a = 1./3.;
-                }
-                else {
-                    a = 1.;
-                }
+            // evaluate a for parallel or antiparallel spin
+            if ((i+j)%2 == 0) { 
+                a = 1./3.;
+            }
+            else {
+                a = 1.;
+            }
             r_12 = sqrt(r_12);
             psi_c = psi_c * exp(a*r_12/(1. + m_beta*r_12));
         }

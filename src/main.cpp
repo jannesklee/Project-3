@@ -4,11 +4,12 @@
 #include <fstream>
 #include <iomanip>
 #include <armadillo>
+#include <omp.h>
+#include <unittest++/UnitTest++.h>
 #include "lib.h"
 #include "singleparticle.h"  //class for single particles
 #include "manybody.h" //class for many-body problems
-#include <omp.h>
-#include <unittest++/UnitTest++.h>
+#include "jastrow.h" //class for derivations of jastrow factor
 //#include <mpi.h>
 
 using namespace  std;
@@ -35,20 +36,18 @@ double  local_energy(mat, double, double, double, int, int, int, double);
 void  output(int, int, int, mat, mat);
 // quantum force for importance sampling
 void quantum_force(int, int, double, double, double, double, mat, mat &);
-// function for gaussian random numbers
-double gaussian_deviate(long *);
 
 /* -------------------------------------------------------------------------- *
  *                        Begin of main program                               *
  * -------------------------------------------------------------------------- */
 int main()
 {
-  int number_cycles = 100000;                 // number of Monte-Carlo steps  //
+  int number_cycles = 1000000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
   int thermalization = 0;                     // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
-  int number_particles = 6;                   // number of particles          //
+  int number_particles = 2;                   // number of particles          //
   double step_length= 0.1;                    // step length                  //
   mat cumulative_e, cumulative_e2;            // energy-matrices              // 
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      // 
@@ -133,9 +132,9 @@ void mc_sampling(int dimension, int number_particles, int charge,
           }
 
           system.SetPosition(r_old);
-          wfold = system.SixElectronSystem();
-          //wfold = particle_old.PerturbedWavefunction();
-          //wfold = particle_old.UnperturbedWavefunction();
+          //wfold = system.SixElectronSystem();
+          //wfold = system.PerturbedWavefunction();
+          wfold = system.PerturbedWavefunction();
 
           quantum_force(number_particles, dimension, alpha, beta, omega, \
                   wfold, r_old, qforce_old);
@@ -160,9 +159,9 @@ void mc_sampling(int dimension, int number_particles, int charge,
               }
 
               system.SetPosition(r_new);
-              wfnew = system.SixElectronSystem();
-              //wfnew = system_new.PerturbedWavefunction();
-              //wfnew= particle_new.UnperturbedWavefunction();
+              //wfnew = system.SixElectronSystem();
+              //wfnew = system.PerturbedWavefunction();
+              wfnew= system.PerturbedWavefunction();
               
               quantum_force(number_particles, dimension, alpha, beta, omega,\
                       wfnew, r_new, qforce_new);
@@ -220,32 +219,55 @@ void mc_sampling(int dimension, int number_particles, int charge,
 void quantum_force(int number_particles, int dimension, double alpha, \
         double beta, double omega, double wf, mat r, mat &qforce)
 {
-    int i, j;
+    int i, j, k;
     double wfminus , wfplus;
     mat r_plus, r_minus;
+    double a, r_12, r_12_comp;
 
     r_plus = zeros<mat>(number_particles,dimension);
     r_minus = zeros<mat>(number_particles,dimension);
     ManyBody system(alpha, beta, dimension, number_particles, omega);
 
-    for(i = 0 ; i < number_particles; i++) {
-        for (j = 0; j < dimension ; j++) {
-            r_plus(i,j) = r_minus(i,j) = r(i,j);
-        }
-    }
+//    for(i = 0 ; i < number_particles; i++) {
+//        for (j = 0; j < dimension ; j++) {
+//            r_plus(i,j) = r_minus(i,j) = r(i,j);
+//        }
+//    }
+//
+//    // quantum the first derivative
+//    for (i = 0; i < number_particles; i++){
+//        for (j = 0; j < dimension; j++){
+//            r_plus(i,j) = r(i,j) + h;
+//            r_minus(i,j) = r(i,j) - h; 
+//            system.SetPosition(r_minus);
+//            //wfminus = system.SixElectronSystem();
+//            wfminus = system.PerturbedWavefunction();
+//            system.SetPosition(r_plus);
+//            //wfplus = system.SixElectronSystem();
+//            wfplus = system.PerturbedWavefunction();
+//            qforce(i,j) = (wfplus - wfminus)/(wf*h);
+//            r_plus(i,j) = r(i,j);
+//            r_minus(i,j) = r(i,j);
+//        }
+//    }
 
-    // quantum the first derivative
-    for (i = 0; i < number_particles; i++){
-        for (j = 0; j < dimension; j++){
-            r_plus(i,j) = r(i,j) + h;
-            r_minus(i,j) = r(i,j) - h; 
-            system.SetPosition(r_minus);
-            wfminus = system.SixElectronSystem();
-            system.SetPosition(r_plus);
-            wfplus = system.SixElectronSystem();
-            qforce(i,j) = (wfplus - wfminus)/(wf*h);
-            r_plus(i,j) = r(i,j);
-            r_minus(i,j) = r(i,j);
+    // closed-form two particles
+    a = 1.0;
+    for (i = 0; i < number_particles-1; i++) { // sum over all inspite particle itself
+        for (j = i+1; j < number_particles; j++) {
+            // one time through all dimensions to evaluate distance
+            r_12 = 0;
+            for (k = 0; k < dimension; k++) {
+                r_12 += (r(i,k)-r(j,k))*(r(i,k)-r(j,k));
+            }
+            r_12 = sqrt(r_12);
+
+            // one time to determine the qforce
+            for (k = 0; k < dimension; k++) {
+                r_12_comp += r(i,k)-r(j,k); // distance of one component
+                qforce(i,k) = 2.*(-alpha*omega*r(i,k) + \
+                        a*r_12_comp / (r_12*(1. + beta*r_12)*(1. + beta*r_12)));
+            }
         }
     }
 }
@@ -274,6 +296,7 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
   }
 
   // ---------------------- kinetic energy ---------------------------------- //
+  // brute force derivation
   e_kinetic = 0;
   for (i = 0; i < number_particles; i++) {
     for (j = 0; j < dimension; j++) {
@@ -281,9 +304,11 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
       r_minus(i,j) = r(i,j) - h;
 
       system.SetPosition(r_minus);
-      wfminus = system.SixElectronSystem();
+      //wfminus = system.SixElectronSystem();
+      wfminus = system.PerturbedWavefunction();
       system.SetPosition(r_plus);
-      wfplus = system.SixElectronSystem();
+      //wfplus = system.SixElectronSystem();
+      wfplus = system.PerturbedWavefunction();
       
       e_kinetic -= (wfminus + wfplus - 2.*wfold);
       r_plus(i,j) = r(i,j);
@@ -292,6 +317,12 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
   }
   // include electron mass and hbar squared and divide by wave function
   e_kinetic = 0.5*h2*e_kinetic/wfold;
+
+  // closed-form solution for kinetic energy
+  e_kinetic = 0.;
+  for (i = 0; i < number_particles; i++) {
+    
+  }
 
   // ---------------------- potential energy -------------------------------- //
   e_potential = 0;

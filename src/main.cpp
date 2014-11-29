@@ -18,10 +18,10 @@ ofstream ofile;
 // the step length and its squared inverse for the second derivative
 #define h 0.001
 #define h2 1000000
-#define abegin 0.16
-#define bbegin 0.76
-#define astep 0.04
-#define bstep 0.04
+#define abegin 0.76
+#define bbegin 0.21
+#define astep 0.08
+#define bstep 0.08
 
 /* -------------------------------------------------------------------------- *
  *                        Declaration of functions                            *
@@ -43,22 +43,22 @@ double gaussian_deviate(long *);
 int main()
 {
   int number_cycles = 1000000;                 // number of Monte-Carlo steps  //
-  int max_variations = 10;                     // max. var. params             //
-  int thermalization = 0;                     // Thermalization steps         //
+  int max_variations = 5;                     // max. var. params             //
+  int thermalization = 100;                     // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 2;                   // number of particles          //
-  double step_length= 0.1;                    // step length                  //
+  double step_length= 2.0;                    // step length                  //
   mat cumulative_e, cumulative_e2;            // energy-matrices              //
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      //
-  double omega = 1;                         // freq. harm. osc.             //
+  double omega = 1.;                         // freq. harm. osc.             //
   int num_threads;                            // number of threads            //
 
   cumulative_e = mat(max_variations+1, max_variations+1);
   cumulative_e2 = mat(max_variations+1, max_variations+1);
 
   // ----------------------- MC sampling ------------------------------------ //
-omp_set_num_threads(4);
+omp_set_num_threads(1);
 #pragma omp parallel shared(cumulative_e_temp, cumulative_e2_temp)
   {
   cumulative_e_temp = mat(max_variations+1, max_variations+1);
@@ -103,7 +103,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
   long idum;
   double alpha, beta, energy, energy2, delta_e, wfold, wfnew;
   double D, greensfunction;
-  D = 0.5; //
+  D = 0.5; 
   alpha = abegin*charge;
   idum=-1;
 
@@ -127,7 +127,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
           for (i = 0; i < number_particles; i++) {
             for (j = 0; j < dimension; j++) {
 //              r_old(i,j) = step_length*(ran2(&idum)-0.5);
-              r_old(i,j) = gaussian_deviate(&idum);//*sqrt(step_length);
+              r_old(i,j) = gaussian_deviate(&idum)*sqrt(step_length);
             }
           }
 
@@ -145,7 +145,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
 //                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
-                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)* //sqrt(step_length)
+                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*sqrt(step_length)
                              + step_length*D*qforce_old(i,j);//
               }
             }
@@ -171,7 +171,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
 
 //            greensfunction = 1.;
             // ----------------- metropolis test ---------------------------- //
-            if (ran1(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
+            if (ran2(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
                 for (i = 0; i < number_particles; i++) {
                     for (j = 0; j < dimension; j++){
                         r_old(i,j) = r_new(i,j);
@@ -326,11 +326,11 @@ void output(int max_variations, int number_cycles, int charge, \
   int i, j;
   double alpha, beta, variance, error;
   alpha = abegin*charge;
- ofile << setw(15) << setprecision(8) << "alpha";
- ofile << setw(15) << setprecision(8) << "beta";
- ofile << setw(15) << setprecision(8) << "cumulative_e(i,j)";
- ofile << setw(15) << setprecision(8) << "variance";
- ofile << setw(15) << setprecision(8) << "error" << endl;
+  ofile << setw(15) << "alpha";
+  ofile << setw(15) << "beta";
+  ofile << setw(15) << "cumulative_e(i,j)";
+  ofile << setw(15) << "variance";
+  ofile << setw(15) << "error" << endl;
   for(i = 1; i <= max_variations; i++){
       alpha += astep;
       beta = bbegin;

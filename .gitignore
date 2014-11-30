@@ -2,3 +2,6 @@
 *.i
 *.out
 *.o
+*.pro
+*.pro.user
+build-MonteCarlo-G49-Release/*

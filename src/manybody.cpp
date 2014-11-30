@@ -40,6 +40,7 @@ double ManyBody::PerturbedWavefunction()
   }
 
   // calculates the relative distance // TODO: At that point too much calculation (loop)
+  r_12 = 0;
   for (i = 0; i < m_number_particles-1; i++) { 
     for (j = i+1; j < m_number_particles; j++) {
       r_12 = 0;

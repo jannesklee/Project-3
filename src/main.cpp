@@ -20,8 +20,8 @@ ofstream ofile;
 #define h2 1000000
 #define abegin 0.76
 #define bbegin 0.21
-#define astep 0.08
-#define bstep 0.08
+#define astep 0.04
+#define bstep 0.04
 
 /* -------------------------------------------------------------------------- *
  *                        Declaration of functions                            *
@@ -34,8 +34,6 @@ double  local_energy(mat, double, double, double, int, int, int, double);
 void  output(int, int, int, mat, mat);
 // quantum force for importance sampling
 void quantum_force(int, int, double, double, double, double, mat, mat &);
-// function for gaussian random numbers
-double gaussian_deviate(long *);
 
 /* -------------------------------------------------------------------------- *
  *                        Begin of main program                               *
@@ -48,21 +46,21 @@ int main()
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 2;                   // number of particles          //
-  double step_length= 2.0;                    // step length                  //
+  double step_length= 0.1;                    // step length                  //
   mat cumulative_e, cumulative_e2;            // energy-matrices              //
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      //
   double omega = 1.;                         // freq. harm. osc.             //
   int num_threads;                            // number of threads            //
 
-  cumulative_e = mat(max_variations+1, max_variations+1);
-  cumulative_e2 = mat(max_variations+1, max_variations+1);
+  cumulative_e = mat(max_variations+1, max_variations+1, fill::zeros);
+  cumulative_e2 = mat(max_variations+1, max_variations+1, fill::zeros);
 
   // ----------------------- MC sampling ------------------------------------ //
-omp_set_num_threads(1);
+omp_set_num_threads(4);
 #pragma omp parallel shared(cumulative_e_temp, cumulative_e2_temp)
   {
-  cumulative_e_temp = mat(max_variations+1, max_variations+1);
-  cumulative_e2_temp = mat(max_variations+1, max_variations+1);
+  cumulative_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
+  cumulative_e2_temp = mat(max_variations+1, max_variations+1, fill::zeros);
   mc_sampling(dimension, number_particles, charge, \
               max_variations, thermalization, number_cycles, \
               step_length, cumulative_e_temp, cumulative_e2_temp, omega);
@@ -74,8 +72,10 @@ omp_set_num_threads(1);
   }
     num_threads = omp_get_num_threads();
   }
+
   cout << num_threads << endl;
   cumulative_e = cumulative_e/num_threads;
+  cout << cumulative_e << endl;
   cumulative_e2 = cumulative_e2/num_threads;
 
 

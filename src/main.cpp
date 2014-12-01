@@ -27,11 +27,13 @@ ofstream ofile;
  *                        Declaration of functions                            *
  * -------------------------------------------------------------------------- */
 // The Mc sampling for the variational Monte Carlo
-void  mc_sampling(int, int, int, int, int, int, double, mat &, mat &, double);
+void mc_sampling(int, int, int, int, int, int, double, mat &, mat &, double,\
+        mat &, mat &);
 // The local energy
-double  local_energy(mat, double, double, double, int, int, int, double);
+double local_energy(mat, double, double, double, int, int, int, double,\
+        double &, double &);
 // prints to screen the results of the calculations
-void  output(int, int, int, mat, mat);
+void output(int, int, int, mat, mat, mat, mat);
 // quantum force for importance sampling
 void quantum_force(int, int, double, double, double, double, mat, mat &);
 
@@ -49,11 +51,16 @@ int main()
   double step_length= 0.1;                    // step length                  //
   mat cumulative_e, cumulative_e2;            // energy-matrices              //
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      //
+  mat kin_e, pot_e;
+  mat kin_e_temp, pot_e_temp;
   double omega = 1.;                         // freq. harm. osc.             //
   int num_threads;                            // number of threads            //
 
   cumulative_e = mat(max_variations+1, max_variations+1, fill::zeros);
   cumulative_e2 = mat(max_variations+1, max_variations+1, fill::zeros);
+  kin_e = mat(max_variations+1, max_variations+1, fill::zeros);
+  pot_e = mat(max_variations+1, max_variations+1, fill::zeros);
+
 
   // ----------------------- MC sampling ------------------------------------ //
 omp_set_num_threads(4);
@@ -61,27 +68,34 @@ omp_set_num_threads(4);
   {
   cumulative_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
   cumulative_e2_temp = mat(max_variations+1, max_variations+1, fill::zeros);
+  kin_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
+  pot_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
   mc_sampling(dimension, number_particles, charge, \
               max_variations, thermalization, number_cycles, \
-              step_length, cumulative_e_temp, cumulative_e2_temp, omega);
+              step_length, cumulative_e_temp, cumulative_e2_temp, omega, \
+              kin_e_temp, pot_e_temp);
 #pragma omp barrier
 #pragma omp critical
   {
     cumulative_e += cumulative_e_temp;
     cumulative_e2 += cumulative_e2_temp;
+    kin_e += kin_e_temp;
+    pot_e += pot_e_temp;
   }
     num_threads = omp_get_num_threads();
   }
 
   cout << num_threads << endl;
   cumulative_e = cumulative_e/num_threads;
-  cout << cumulative_e << endl;
   cumulative_e2 = cumulative_e2/num_threads;
+  kin_e = kin_e/num_threads;
+  pot_e = pot_e/num_threads;
 
 
   // ------------------------- Output --------------------------------------- //
   ofile.open("vmc.dat");
-  output(max_variations, number_cycles, charge, cumulative_e, cumulative_e2);
+  output(max_variations, number_cycles, charge, cumulative_e, cumulative_e2,\
+          kin_e, pot_e);
   ofile.close();  // close output file
 
 
@@ -97,12 +111,15 @@ omp_set_num_threads(4);
 void mc_sampling(int dimension, int number_particles, int charge,
                  int max_variations,
                  int thermalization, int number_cycles, double step_length,
-                 mat &cumulative_e, mat &cumulative_e2, double omega){
+                 mat &cumulative_e, mat &cumulative_e2, double omega,
+                 mat &kin_e, mat &pot_e){
 
   int cycles, variate, variate2, accept, i, j, k, thread;
   long idum;
   double alpha, beta, energy, energy2, delta_e, wfold, wfnew;
-  double D, greensfunction;
+  double D, greensfunction, del_kin_e, del_pot_e;
+  double kinetic_energy, potential_energy;
+
   D = 0.5; 
   alpha = abegin*charge;
   idum=-1;
@@ -120,7 +137,8 @@ void mc_sampling(int dimension, int number_particles, int charge,
       beta = bbegin*charge;
       for (variate2 = 1; variate2 <= max_variations; variate2++){
           beta += bstep;
-          energy = energy2 = 0; accept = 0; delta_e = 0;
+          energy = energy2 = kinetic_energy = potential_energy = 0; 
+          accept = 0; delta_e = 0;
           system.SetVariables(alpha, beta);
 
           //  initial trial position
@@ -190,10 +208,13 @@ void mc_sampling(int dimension, int number_particles, int charge,
             // ----------------- local energy ------------------------------- //
             if (cycles > thermalization) {
               delta_e = local_energy(r_old, alpha, beta, wfold, dimension,
-                                     number_particles, charge, omega);
+                                     number_particles, charge, omega, \
+                                     del_kin_e, del_pot_e);
               // update energies
               energy += delta_e;
               energy2 += delta_e*delta_e;
+              kinetic_energy += del_kin_e;
+              potential_energy += del_pot_e;
             }
           }
           // ------------- end loop over monte carlo cycles ----------------- //
@@ -201,6 +222,8 @@ void mc_sampling(int dimension, int number_particles, int charge,
           // update the energy average and its squared
           cumulative_e(variate, variate2) = energy/number_cycles;
           cumulative_e2(variate, variate2) = energy2/number_cycles;
+          kin_e(variate, variate2) = kinetic_energy/number_cycles;
+          pot_e(variate, variate2) = potential_energy/number_cycles;
 
           thread = omp_get_thread_num();
 #pragma omp critical
@@ -209,6 +232,8 @@ void mc_sampling(int dimension, int number_particles, int charge,
                << "beta = " << beta << setw(20)
                << "accepted steps = " << accept << setw(20)
                << "energy = " << cumulative_e(variate,variate2) << setw(20)
+               << "kinetic energy = " << kin_e(variate,variate2) << setw(20)
+               << "potential energy = " << pot_e(variate,variate2) << setw(20)
                << "thread = " << thread << endl;
           }
       }
@@ -254,8 +279,9 @@ void quantum_force(int number_particles, int dimension, double alpha, \
 /* -------------------------------------------------------------------------- *
  *        Function to calculate the local energy with num derivative          *
  * -------------------------------------------------------------------------- */
-double  local_energy(mat r, double alpha, double beta, double wfold,\
-          int dimension, int number_particles, int charge, double omega)
+double local_energy(mat r, double alpha, double beta, double wfold,\
+          int dimension, int number_particles, int charge, double omega,\
+          double &kin_e, double &pot_e)
 {
   int i, j , k;
   double e_local, e_kinetic, e_potential, r_12, r_single_particle;
@@ -318,6 +344,8 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
   }
 
   // -------------------------- total energy -------------------------------- //
+  kin_e = e_kinetic;
+  pot_e = e_potential;
   e_local = e_potential + e_kinetic;
   return e_local;
 }
@@ -325,7 +353,7 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
 
 // output function
 void output(int max_variations, int number_cycles, int charge, \
-        mat cumulative_e, mat cumulative_e2)
+        mat cumulative_e, mat cumulative_e2, mat kin_e, mat pot_e)
 {
   int i, j;
   double alpha, beta, variance, error;
@@ -333,8 +361,10 @@ void output(int max_variations, int number_cycles, int charge, \
   ofile << setw(15) << "alpha";
   ofile << setw(15) << "beta";
   ofile << setw(15) << "cumulative_e(i,j)";
-  ofile << setw(15) << "variance";
-  ofile << setw(15) << "error" << endl;
+  ofile << setw(15) << "kinetic energy";
+  ofile << setw(15) << "potential energy"; 
+  ofile << setw(15) << "variance (cum_e)";
+  ofile << setw(15) << "error (cum_e)" << endl;
   for(i = 1; i <= max_variations; i++){
       alpha += astep;
       beta = bbegin;
@@ -346,6 +376,8 @@ void output(int max_variations, int number_cycles, int charge, \
           ofile << setw(15) << setprecision(8) << alpha;
           ofile << setw(15) << setprecision(8) << beta;
           ofile << setw(15) << setprecision(8) << cumulative_e(i,j);
+          ofile << setw(15) << setprecision(8) << kin_e(i,j);
+          ofile << setw(15) << setprecision(8) << pot_e(i,j);
           ofile << setw(15) << setprecision(8) << variance;
           ofile << setw(15) << setprecision(8) << error << endl;
       }

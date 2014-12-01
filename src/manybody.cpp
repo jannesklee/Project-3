@@ -88,8 +88,6 @@ double ManyBody::SixElectronSystem()
         }
         argument += r_single_particle; 
     }
-    //cout << "-- calculated absolute position" << endl;
-    //cout << argument << endl;
 
     // calculates the relative distance 
     psi_c = 1.0;
@@ -110,8 +108,6 @@ double ManyBody::SixElectronSystem()
             psi_c = psi_c * exp(a*r_12/(1. + m_beta*r_12));
         }
     }
-    //cout << "-- calculated relative distances" << endl;
-    //cout << r_12 << setw(15) << psi_c << endl;
 
     // ------------------------ Unpurturbed part ---------------------------- //
     // spin-up particles
@@ -129,8 +125,6 @@ double ManyBody::SixElectronSystem()
     particle[5].SetAll(conv_to<vec>::from(m_r.row(3)), 0, 1, m_dimension,\
             m_omega, m_alpha);
 
-    //cout << "-- setup particles" << endl;
-
     // filling of slater matrix
     for (i = 0; i < red_slater_size; i++) {
         for (j = 0; j < red_slater_size; j++) {
@@ -142,24 +136,23 @@ double ManyBody::SixElectronSystem()
             slater_down(i,j) = particle[i*2+1].Wavefunction();
         }
     }
-    //cout << "-- filled slater matrix" << endl;
-    //cout << slater_up << endl << slater_down << endl; 
 
     // calculate slater determinant applying sarrus' rule
     det_slater_up = det_slater_down = 0;
     for (j = 0; j < red_slater_size; j++) {
-        det_slater_up += slater_up(0,j)*slater_up(1,(j+1)%3)*\
+        det_slater_up += slater_up(0,j)*slater_up(1,(j+1)%3)*
                          slater_up(2,(j+2)%3);
-        det_slater_up -= slater_up(2,j)*slater_up(1,(j+1)%3)*\
+        det_slater_up -= slater_up(2,j)*slater_up(1,(j+1)%3)*
                          slater_up(0,(j+2)%3);
 
-        det_slater_down += slater_down(0,j)*slater_down(1,(j+1)%3)*\
+        det_slater_down += slater_down(0,j)*slater_down(1,(j+1)%3)*
                          slater_down(2,(j+2)%3);
-        det_slater_down -= slater_down(2,j)*slater_down(1,(j+1)%3)*\
+        det_slater_down -= slater_down(2,j)*slater_down(1,(j+1)%3)*
                          slater_down(0,(j+2)%3);
     }
-    //cout << "-- calculated determinant" << endl;
-    //cout << det_slater_up << setw(15) << det_slater_down << endl;
+
+    //det_slater_up = det(slater_up);
+    //det_slater_down = det(slater_down);
 
     // ---------------------- calculate wavefunction ------------------------ //
     wf = det_slater_up*det_slater_down*psi_c;

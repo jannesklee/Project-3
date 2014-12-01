@@ -18,8 +18,8 @@ ofstream ofile;
 // the step length and its squared inverse for the second derivative
 #define h 0.001
 #define h2 1000000
-#define abegin 0.76
-#define bbegin 0.21
+#define abegin 0.96
+#define bbegin 0.36
 #define astep 0.04
 #define bstep 0.04
 
@@ -42,12 +42,12 @@ void quantum_force(int, int, double, double, double, double, mat, mat &);
  * -------------------------------------------------------------------------- */
 int main()
 {
-  int number_cycles = 1000000;                 // number of Monte-Carlo steps  //
+  int number_cycles = 100000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
   int thermalization = 100;                     // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
-  int number_particles = 2;                   // number of particles          //
+  int number_particles = 6;                   // number of particles          //
   double step_length= 0.1;                    // step length                  //
   mat cumulative_e, cumulative_e2;            // energy-matrices              //
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      //
@@ -150,8 +150,8 @@ void mc_sampling(int dimension, int number_particles, int charge,
           }
 
           system.SetPosition(r_old);
-          //wfold = system.SixElectronSystem();
-          wfold = system.PerturbedWavefunction();
+          wfold = system.SixElectronSystem();
+          //wfold = system.PerturbedWavefunction();
           //wfold = particle_old.UnperturbedWavefunction();
 
           quantum_force(number_particles, dimension, alpha, beta, omega, \
@@ -163,18 +163,19 @@ void mc_sampling(int dimension, int number_particles, int charge,
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
 //                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
-                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)* //sqrt(step_length)
-                             + step_length*D*qforce_old(i,j);// 
+                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*sqrt(step_length)
+                           + step_length*D*qforce_old(i,j);
               }
+            }
               
-              // we move only one particle at the time
-              for (k = 0; k < number_particles; k++) {
-                  if (k != i) { 
-                      for (j = 0; j < dimension; j++) {  // resets all elements to old
-                          r_new(k,j) = r_old(k,j);
-                      }
-                  }
-              }
+             // // we move only one particle at the time
+             // for (k = 0; k < number_particles; k++) {
+             //     if (k != i) { 
+             //         for (j = 0; j < dimension; j++) {  // resets all elements to old
+             //             r_new(k,j) = r_old(k,j);
+             //         }
+             //     }
+             // }
 
               system.SetPosition(r_new);
               wfnew = system.SixElectronSystem();
@@ -186,24 +187,28 @@ void mc_sampling(int dimension, int number_particles, int charge,
               
               // ------------------ greensfunction ---------------------------- //
               greensfunction = 0.0;
+              for (i = 0; i < number_particles; i++){
               for (j = 0; j < dimension; j++) {
                   greensfunction += 0.5*(qforce_old(i,j) + qforce_new(i,j))* \
                      (D*step_length*0.5*(qforce_old(i,j) - qforce_new(i,j))- \
                       r_new(i,j) + r_old(i,j));
               }
+              }
               greensfunction = exp(greensfunction);
 
 //              greensfunction = 1.;
               // ----------------- metropolis test ---------------------------- //
-              if (ran2(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
+              if (ran1(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
+                  for (i = 0; i < number_particles; i++) {
                   for (j = 0; j < dimension; j++){
                       r_old(i,j) = r_new(i,j);
                       qforce_old(i,j) = qforce_new(i,j); 
                   }
+                  }
               wfold = wfnew;
               accept = accept + 1;
               }
-            }
+ //           }
 
             // ----------------- local energy ------------------------------- //
             if (cycles > thermalization) {
@@ -264,11 +269,11 @@ void quantum_force(int number_particles, int dimension, double alpha, \
             r_plus(i,j) = r(i,j) + h;
             r_minus(i,j) = r(i,j) - h;
             system.SetPosition(r_minus);
-            wfminus = system.PerturbedWavefunction();
-           // wfminus = system.SixElectronSystem();
+            //wfminus = system.PerturbedWavefunction();
+            wfminus = system.SixElectronSystem();
             system.SetPosition(r_plus);
-            wfplus = system.PerturbedWavefunction();
-            //wfplus = system.SixElectronSystem();
+            //wfplus = system.PerturbedWavefunction();
+            wfplus = system.SixElectronSystem();
             qforce(i,j) = (wfplus - wfminus)/(wf*h);
             r_plus(i,j) = r(i,j);
             r_minus(i,j) = r(i,j);
@@ -308,11 +313,11 @@ double local_energy(mat r, double alpha, double beta, double wfold,\
       r_minus(i,j) = r(i,j) - h;
 
       system.SetPosition(r_minus);
-      wfminus = system.PerturbedWavefunction();
-      //wfminus = system.SixElectronSystem();
+      //wfminus = system.PerturbedWavefunction();
+      wfminus = system.SixElectronSystem();
       system.SetPosition(r_plus);
-      wfplus = system.PerturbedWavefunction();
-      //wfplus = system.SixElectronSystem();
+      //wfplus = system.PerturbedWavefunction();
+      wfplus = system.SixElectronSystem();
 
       e_kinetic -= (wfminus + wfplus - 2.*wfold);
       r_plus(i,j) = r(i,j);

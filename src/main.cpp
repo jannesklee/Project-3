@@ -166,16 +166,16 @@ void mc_sampling(int dimension, int number_particles, int charge,
                 r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*sqrt(step_length)
                            + step_length*D*qforce_old(i,j);
               }
-            }
+//            }
               
-             // // we move only one particle at the time
-             // for (k = 0; k < number_particles; k++) {
-             //     if (k != i) { 
-             //         for (j = 0; j < dimension; j++) {  // resets all elements to old
-             //             r_new(k,j) = r_old(k,j);
-             //         }
-             //     }
-             // }
+              // we move only one particle at the time
+              for (k = 0; k < number_particles; k++) {
+                  if (k != i) { 
+                      for (j = 0; j < dimension; j++) {  // resets all elements to old
+                          r_new(k,j) = r_old(k,j);
+                      }
+                  }
+              }
 
               system.SetPosition(r_new);
               wfnew = system.SixElectronSystem();
@@ -187,28 +187,28 @@ void mc_sampling(int dimension, int number_particles, int charge,
               
               // ------------------ greensfunction ---------------------------- //
               greensfunction = 0.0;
-              for (i = 0; i < number_particles; i++){
+//            for (i = 0; i < number_particles; i++){
               for (j = 0; j < dimension; j++) {
                   greensfunction += 0.5*(qforce_old(i,j) + qforce_new(i,j))* \
                      (D*step_length*0.5*(qforce_old(i,j) - qforce_new(i,j))- \
                       r_new(i,j) + r_old(i,j));
               }
-              }
+//              }
               greensfunction = exp(greensfunction);
 
 //              greensfunction = 1.;
               // ----------------- metropolis test ---------------------------- //
-              if (ran1(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
-                  for (i = 0; i < number_particles; i++) {
+              if (ran2(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
+//                  for (i = 0; i < number_particles; i++) {
                   for (j = 0; j < dimension; j++){
                       r_old(i,j) = r_new(i,j);
                       qforce_old(i,j) = qforce_new(i,j); 
                   }
-                  }
+//                  }
               wfold = wfnew;
               accept = accept + 1;
               }
- //           }
+            }
 
             // ----------------- local energy ------------------------------- //
             if (cycles > thermalization) {
@@ -237,8 +237,8 @@ void mc_sampling(int dimension, int number_particles, int charge,
                << "beta = " << beta << setw(20)
                << "accepted steps = " << accept << setw(20)
                << "energy = " << cumulative_e(variate,variate2) << setw(20)
-               << "kinetic energy = " << kin_e(variate,variate2) << setw(20)
-               << "potential energy = " << pot_e(variate,variate2) << setw(20)
+               << "kin. energy = " << kin_e(variate,variate2) << setw(20)
+               << "pot. energy = " << pot_e(variate,variate2) << setw(20)
                << "thread = " << thread << endl;
           }
       }

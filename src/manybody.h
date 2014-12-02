@@ -23,6 +23,14 @@ class ManyBody
         ManyBody(int dimension, int number_particles, double omega);
         double PerturbedWavefunction();
         double UnperturbedWavefunction();
+
+//!\brief trial wave function for six electron system
+ 
+//! SixElectronSystem calculates the trial wave function in two steps. The first
+//! one consists of the calculation of the Jastrow-factor, the second the unpur-
+//! turbed part of the wavefunction. The latter thereby fills in two slater 
+//! determinants for either spin up or spin down particles and evaluates the
+//! determinant applying Sarrus' rule.
         double SixElectronSystem();
         void SetPosition(mat r);
         void SetVariables(double alpha, double beta);

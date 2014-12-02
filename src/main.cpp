@@ -27,7 +27,7 @@ ofstream ofile;
  *                        Declaration of functions                            *
  * -------------------------------------------------------------------------- */
 // The Mc sampling for the variational Monte Carlo
-void mc_sampling(int, int, int, int, int, int, double, mat &, mat &, double,\
+void mc_sampling(int, int, int, int, int, double, mat &, mat &, double,\
         mat &, mat &);
 // The local energy
 double local_energy(mat, double, double, double, int, int, int, double,\
@@ -42,9 +42,8 @@ void quantum_force(int, int, double, double, double, double, mat, mat &);
  * -------------------------------------------------------------------------- */
 int main()
 {
-  int number_cycles = 100000;                 // number of Monte-Carlo steps  //
+  int number_cycles = 50000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
-  int thermalization = 100;                     // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 6;                   // number of particles          //
@@ -63,7 +62,7 @@ int main()
 
 
   // ----------------------- MC sampling ------------------------------------ //
-omp_set_num_threads(4);
+//omp_set_num_threads(1);
 #pragma omp parallel shared(cumulative_e_temp, cumulative_e2_temp)
   {
   cumulative_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
@@ -71,7 +70,7 @@ omp_set_num_threads(4);
   kin_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
   pot_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
   mc_sampling(dimension, number_particles, charge, \
-              max_variations, thermalization, number_cycles, \
+              max_variations, number_cycles, \
               step_length, cumulative_e_temp, cumulative_e2_temp, omega, \
               kin_e_temp, pot_e_temp);
 #pragma omp barrier
@@ -109,8 +108,7 @@ omp_set_num_threads(4);
  *             Monte Carlo sampling with the Metropolis algorithm             *
  * -------------------------------------------------------------------------- */
 void mc_sampling(int dimension, int number_particles, int charge,
-                 int max_variations,
-                 int thermalization, int number_cycles, double step_length,
+                 int max_variations, int number_cycles, double step_length,
                  mat &cumulative_e, mat &cumulative_e2, double omega,
                  mat &kin_e, mat &pot_e){
 
@@ -144,7 +142,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
           //  initial trial position
           for (i = 0; i < number_particles; i++) {
             for (j = 0; j < dimension; j++) {
-//              r_old(i,j) = step_length*(ran2(&idum)-0.5);
+//             r_old(i,j) = step_length*(ran2(&idum)-0.5);
               r_old(i,j) = gaussian_deviate(&idum)*sqrt(step_length);
             }
           }
@@ -158,7 +156,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
                   wfold, r_old, qforce_old);
 
           // -------------- loop over monte carlo cycles -------------------- //
-          for (cycles = 1; cycles <= number_cycles+thermalization; cycles++){
+          for (cycles = 1; cycles <= number_cycles; cycles++){
             // new position
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
@@ -208,19 +206,21 @@ void mc_sampling(int dimension, int number_particles, int charge,
               wfold = wfnew;
               accept = accept + 1;
               }
+//              else {
+//                  cout << omp_get_thread_num()<< setw(14)<< greensfunction*wfnew*wfnew/wfold/wfold << setw(14) <<
+//                    greensfunction << setw(14) << wfnew << setw(14) << wfold <<  endl;
+//              }
             }
 
             // ----------------- local energy ------------------------------- //
-            if (cycles > thermalization) {
-              delta_e = local_energy(r_old, alpha, beta, wfold, dimension,
-                                     number_particles, charge, omega, \
-                                     del_kin_e, del_pot_e);
-              // update energies
-              energy += delta_e;
-              energy2 += delta_e*delta_e;
-              kinetic_energy += del_kin_e;
-              potential_energy += del_pot_e;
-            }
+            delta_e = local_energy(r_old, alpha, beta, wfold, dimension,
+                                   number_particles, charge, omega, \
+                                   del_kin_e, del_pot_e);
+            // update energies
+            energy += delta_e;
+            energy2 += delta_e*delta_e;
+            kinetic_energy += del_kin_e;
+            potential_energy += del_pot_e;
           }
           // ------------- end loop over monte carlo cycles ----------------- //
 

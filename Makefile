@@ -1,6 +1,6 @@
 TARGET = main.out
 CC = c++
-CFLAGS = -Wall -Wextra -Isrc -larmadillo -llapack -lblas -fopenmp -O2 $(DEBUG)
+CFLAGS = -Wall -Wextra -llapack -lblas -larmadillo -fopenmp -Isrc -O2 $(DEBUG)
 DEBUG = -g
 
 SRCDIR = src
@@ -17,11 +17,11 @@ OBJECTS = $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o,$(SOURCES))
 
 # compiling
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
-	LC_MESSAGES=C $(CC) -c $(CFLAGS) -o $@ $<
+	LC_MESSAGES=C $(CC) -o $@ $< -c $(CFLAGS)
 
 # linking
 $(TARGET): $(OBJECTS)
-	LC_MESSAGES=C $(CC) $(CFLAGS) -o $@ $^ 
+	LC_MESSAGES=C $(CC) -o $@ $^ $(CFLAGS) 
 
 all: main.out 
 

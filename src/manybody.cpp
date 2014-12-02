@@ -1,7 +1,8 @@
+#include <iomanip>
+#include <armadillo>
 #include "singleparticle.h"
 #include "manybody.h"
-#include <armadillo>
-#include <iomanip>
+#include <omp.h>
 
 using namespace arma;
 using namespace std; 
@@ -55,13 +56,6 @@ double ManyBody::PerturbedWavefunction()
   return wf;
 }
 
-//!\brief trial wave function for six electron system
- 
-//! SixElectronSystem calculates the trial wave function in two steps. The first
-//! one consists of the calculation of the Jastrow-factor, the second the unpur-
-//! turbed part of the wavefunction. The latter thereby fills in two slater 
-//! determinants for either spin up or spin down particles and evaluates the
-//! determinant applying Sarrus' rule.
 double ManyBody::SixElectronSystem()
 {
     // TODO: the matrix m_r is not coupled to the vecotrs m_r in singleparticle
@@ -137,26 +131,28 @@ double ManyBody::SixElectronSystem()
         }
     }
 
-    // calculate slater determinant applying sarrus' rule
-    det_slater_up = det_slater_down = 0;
-    for (j = 0; j < red_slater_size; j++) {
-        det_slater_up += slater_up(0,j)*slater_up(1,(j+1)%3)*
-                         slater_up(2,(j+2)%3);
-        det_slater_up -= slater_up(2,j)*slater_up(1,(j+1)%3)*
-                         slater_up(0,(j+2)%3);
 
-        det_slater_down += slater_down(0,j)*slater_down(1,(j+1)%3)*
-                         slater_down(2,(j+2)%3);
-        det_slater_down -= slater_down(2,j)*slater_down(1,(j+1)%3)*
-                         slater_down(0,(j+2)%3);
-    }
+//    // calculate slater determinant applying sarrus' rule
+//    det_slater_up = det_slater_down = 0;
+//    for (j = 0; j < red_slater_size; j++) {
+//        det_slater_up += slater_up(0,j)*slater_up(1,(j+1)%3)*
+//                         slater_up(2,(j+2)%3);
+//        det_slater_up -= slater_up(2,j)*slater_up(1,(j+1)%3)*
+//                         slater_up(0,(j+2)%3);
+//
+//        det_slater_down += slater_down(0,j)*slater_down(1,(j+1)%3)*
+//                         slater_down(2,(j+2)%3);
+//        det_slater_down -= slater_down(2,j)*slater_down(1,(j+1)%3)*
+//                         slater_down(0,(j+2)%3);
+//    }
+    
+    det_slater_up = det(slater_up);
+    det_slater_down = det(slater_down);
 
-    //det_slater_up = det(slater_up);
-    //det_slater_down = det(slater_down);
 
     // ---------------------- calculate wavefunction ------------------------ //
+    
     wf = det_slater_up*det_slater_down*psi_c;
-    //cout << "wavefunction = " << wf << endl;
     return wf;
 }
 

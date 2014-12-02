@@ -229,57 +229,42 @@ void quantum_force(int number_particles, int dimension, double alpha, \
     r_plus = zeros<mat>(number_particles,dimension);
     r_minus = zeros<mat>(number_particles,dimension);
     ManyBody system(alpha, beta, dimension, number_particles, omega);
+    Slater slater_mat();
 
-//    for(i = 0 ; i < number_particles; i++) {
-//        for (j = 0; j < dimension ; j++) {
-//            r_plus(i,j) = r_minus(i,j) = r(i,j);
-//        }
-//    }
+    slater_mat.SetupSixElectron();
+    //slater_mat.SetupTwoElectron();
+    slater_mat.InitInverseSlaterMatrices();
+    
+
+    qforce(i,k) = 2.*(grad_slater(i,k) + grad_jastrow(i,k);
+
+//    // closed-form two particles
+//    a = 1.0;
+//    for (i = 0; i < number_particles-1; i++) { // sum over all inspite particle itself
+//        for (j = i+1; j < number_particles; j++) {
+//            // one time through all dimensions to evaluate distance
+//            r_12 = 0;
+//            for (k = 0; k < dimension; k++) {
+//                r_12 += (r(i,k)-r(j,k))*(r(i,k)-r(j,k));
+//            }
+//            r_12 = sqrt(r_12);
 //
 //    // quantum the first derivative
 //    for (i = 0; i < number_particles; i++){
 //        for (j = 0; j < dimension; j++){
 //            r_plus(i,j) = r(i,j) + h;
-//            r_minus(i,j) = r(i,j) - h; 
+//            r_minus(i,j) = r(i,j) - h;
 //            system.SetPosition(r_minus);
-//            //wfminus = system.SixElectronSystem();
 //            wfminus = system.PerturbedWavefunction();
+//           // wfminus = system.SixElectronSystem();
 //            system.SetPosition(r_plus);
-//            //wfplus = system.SixElectronSystem();
 //            wfplus = system.PerturbedWavefunction();
+//            //wfplus = system.SixElectronSystem();
 //            qforce(i,j) = (wfplus - wfminus)/(wf*h);
 //            r_plus(i,j) = r(i,j);
 //            r_minus(i,j) = r(i,j);
 //        }
 //    }
-
-    // closed-form two particles
-    a = 1.0;
-    for (i = 0; i < number_particles-1; i++) { // sum over all inspite particle itself
-        for (j = i+1; j < number_particles; j++) {
-            // one time through all dimensions to evaluate distance
-            r_12 = 0;
-            for (k = 0; k < dimension; k++) {
-                r_12 += (r(i,k)-r(j,k))*(r(i,k)-r(j,k));
-            }
-            r_12 = sqrt(r_12);
-
-    // quantum the first derivative
-    for (i = 0; i < number_particles; i++){
-        for (j = 0; j < dimension; j++){
-            r_plus(i,j) = r(i,j) + h;
-            r_minus(i,j) = r(i,j) - h;
-            system.SetPosition(r_minus);
-            wfminus = system.PerturbedWavefunction();
-           // wfminus = system.SixElectronSystem();
-            system.SetPosition(r_plus);
-            wfplus = system.PerturbedWavefunction();
-            //wfplus = system.SixElectronSystem();
-            qforce(i,j) = (wfplus - wfminus)/(wf*h);
-            r_plus(i,j) = r(i,j);
-            r_minus(i,j) = r(i,j);
-        }
-    }
 }
 
 /* -------------------------------------------------------------------------- *

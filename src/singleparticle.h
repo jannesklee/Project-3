@@ -4,6 +4,7 @@
 
 using namespace arma;
 
+//! Single Particle class
 class SingleParticle
 {
     protected:
@@ -18,6 +19,8 @@ class SingleParticle
         void SetAll(vec r, int nx, int ny, int dimension, double omega,\
                 double alpha);
         double Wavefunction();
+        vec GetGradient(int nx, int ny);
+        double GetLaplacian(int nx, int ny);
 };
 
 #endif // SINGLEPARTICLE_H

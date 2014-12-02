@@ -6,6 +6,53 @@
 using namespace arma;
 using namespace std; 
 
+// ------------------------- constructors ----------------------------------- //
+ManyBody::ManyBody()
+{
+}
+
+ManyBody::ManyBody(int dimension, int number_particles, double omega)
+{
+    m_dimension = dimension;
+    m_number_particles = number_particles;
+    m_omega = omega;
+}
+
+ManyBody::ManyBody(double alpha, double beta, int dimension, \
+        int number_particles, double omega)
+{
+    m_alpha = alpha;
+    m_beta = beta;
+    m_dimension = dimension;
+    m_number_particles = number_particles;
+    m_omega = omega;
+}
+
+ManyBody::ManyBody(mat r, double alpha, double beta, int dimension, \
+        int number_particles, double omega)
+{
+    m_r = r;
+    m_alpha = alpha;
+    m_beta = beta;
+    m_dimension = dimension;
+    m_number_particles = number_particles;
+    m_omega = omega;
+}
+
+
+// ------------------------ setters, getters -------------------------------- //
+void ManyBody::SetPosition(mat r) {
+    m_r = r;
+}
+
+void ManyBody::SetVariables(double alpha, double beta) {
+    m_alpha = alpha;
+    m_beta = beta;
+}
+
+
+// ------------------------- wavefunctions ---------------------------------- //
+ManyBody::ManyBody()
 double ManyBody::UnperturbedWavefunction()
 {
   int i, j;
@@ -54,13 +101,6 @@ double ManyBody::PerturbedWavefunction()
   return wf;
 }
 
-//!\brief trial wave function for six electron system
- 
-//! SixElectronSystem calculates the trial wave function in two steps. The first
-//! one consists of the calculation of the Jastrow-factor, the second the unpur-
-//! turbed part of the wavefunction. The latter thereby fills in two slater 
-//! determinants for either spin up or spin down particles and evaluates the
-//! determinant applying Sarrus' rule.
 double ManyBody::SixElectronSystem()
 {
     // TODO: the matrix m_r is not coupled to the vecotrs m_r in singleparticle
@@ -164,47 +204,4 @@ double ManyBody::SixElectronSystem()
     wf = det_slater_up*det_slater_down*psi_c;
     //cout << "wavefunction = " << wf << endl;
     return wf;
-}
-
-// ------------------------ setters, getters -------------------------------- //
-void ManyBody::SetPosition(mat r) {
-    m_r = r;
-}
-
-void ManyBody::SetVariables(double alpha, double beta) {
-    m_alpha = alpha;
-    m_beta = beta;
-}
-
-// ------------------------- constructors ----------------------------------- //
-ManyBody::ManyBody()
-{
-}
-
-ManyBody::ManyBody(int dimension, int number_particles, double omega)
-{
-    m_dimension = dimension;
-    m_number_particles = number_particles;
-    m_omega = omega;
-}
-
-ManyBody::ManyBody(double alpha, double beta, int dimension, \
-        int number_particles, double omega)
-{
-    m_alpha = alpha;
-    m_beta = beta;
-    m_dimension = dimension;
-    m_number_particles = number_particles;
-    m_omega = omega;
-}
-
-ManyBody::ManyBody(mat r, double alpha, double beta, int dimension, \
-        int number_particles, double omega)
-{
-    m_r = r;
-    m_alpha = alpha;
-    m_beta = beta;
-    m_dimension = dimension;
-    m_number_particles = number_particles;
-    m_omega = omega;
 }

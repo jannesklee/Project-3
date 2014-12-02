@@ -2,8 +2,48 @@
 #include <armadillo>
 
 using namespace arma;
-// TODO: in singleplarticle geht kein alpha ein
 
+// -------------------------- constructors ---------------------------------- //
+SingleParticle::SingleParticle()
+{
+    m_r = 1.0;
+    m_nx = 0;
+    m_ny = 0;
+    m_dimension = 2;
+    m_omega = 1.0;
+    m_alpha = 1.0; 
+}
+
+SingleParticle::SingleParticle(vec r,int nx, int ny, int dimension,\
+        double omega, double alpha)
+{
+    m_r = r;
+    m_nx = nx;
+    m_ny = ny;
+    m_dimension = dimension;
+    m_omega = omega;
+    m_alpha = alpha; 
+}
+
+
+// -------------------- setters, getters ------------------------------------ //
+void SingleParticle::SetPosition(vec r) {
+    m_r = r;
+}
+
+void SingleParticle::SetAll(vec r, int nx, int ny, int dimension, double omega,\
+        double alpha)
+{
+    m_r = r;
+    m_nx = nx;
+    m_ny = ny;
+    m_dimension = dimension;
+    m_omega = omega;
+    m_alpha = alpha; 
+}
+
+
+// -------------------------- wavefunctions --------------------------------- //
 double SingleParticle::Wavefunction()
 {
   int i;
@@ -42,40 +82,44 @@ double SingleParticle::Wavefunction()
   return wf;
 }
 
-void SingleParticle::SetPosition(vec r) {
-    m_r = r;
+vec SingleParticle::GetGradient() {
+    vec slater_grad;
+    double c;
+
+    c = m_omega*m_alpha
+    if (m_nx == 0 && m_ny == 0) {
+        slater_grad(0) = -c*m_r(0);
+        slater_grad(1) = -c*m_r(1);
+    }
+    else if (m_nx == 1 && m_ny == 0) {
+        slater_grad(0) = -(sqrt(c)*m_r(0)-1.)*(sqrt(c)*m_r(0)+1.);
+        slater_grad(1) = -c*m_r(0)*m_r(1);
+    }
+    else if (m_nx == 0 && m_ny == 1) {
+        slater_grad(0) = -c*m_r(0)*m_r(1);
+        slater_grad(1) = -(sqrt(c)*m_r(1)-1.)*(sqrt(c)*m_r(1)+1.);
+    }
+    slater_grad = slater_grad*exp(-0.5*c*(m_r(0)*m_r(0)+m_r(1)*m_r(1)));
+
+    return slater_grad;
 }
 
-void SingleParticle::SetAll(vec r, int nx, int ny, int dimension, double omega,\
-        double alpha)
-{
-    m_r = r;
-    m_nx = nx;
-    m_ny = ny;
-    m_dimension = dimension;
-    m_omega = omega;
-    m_alpha = alpha; 
-}
+void SingleParticle::GetLaplacian() {
+    double laplacian; 
+    double r_single_particle2;
 
-// constructor 
-SingleParticle::SingleParticle(vec r,int nx, int ny, int dimension,\
-        double omega, double alpha)
-{
-    m_r = r;
-    m_nx = nx;
-    m_ny = ny;
-    m_dimension = dimension;
-    m_omega = omega;
-    m_alpha = alpha; 
-}
+    r_single_particle2 = m_r(0)*m_r(0) + m_r(1)*m_r(1);
+  
+    if (m_nx == 0 && m_ny == 0){
+        slater_lap = c*(c*r_single_particle2 - 2.)
+    }
+    else if (m_nx == 1 && m_ny == 0) {
+        slater_lap = c*m_r(0)*(c*r_single_particle2 - 4.)
+    }
+    else if (m_nx == 0 && m_ny == 1) {
+        slater_lap = c*m_r(1)*(c*r_single_particle2 - 4.)
+    }
 
-// default constructor
-SingleParticle::SingleParticle()
-{
-    m_r = 1.0;
-    m_nx = 0;
-    m_ny = 0;
-    m_dimension = 2;
-    m_omega = 1.0;
-    m_alpha = 1.0; 
+    slater_lap = slater_lap*exp(-0.5*c*(m_r(0)*m_r(0)+m_r(1)*m_r(1)));
+    return slater_lap;
 }

@@ -20,8 +20,8 @@ ofstream ofile;
 // the step length and its squared inverse for the second derivative
 #define h 0.001
 #define h2 1000000
-#define abegin 0.76
-#define bbegin 0.21
+#define abegin 0.96
+#define bbegin 0.36
 #define astep 0.04
 #define bstep 0.04
 
@@ -29,11 +29,13 @@ ofstream ofile;
  *                        Declaration of functions                            *
  * -------------------------------------------------------------------------- */
 // The Mc sampling for the variational Monte Carlo
-void  mc_sampling(int, int, int, int, int, int, double, mat &, mat &, double);
+void mc_sampling(int, int, int, int, int, double, mat &, mat &, double,\
+        mat &, mat &);
 // The local energy
-double  local_energy(mat, double, double, double, int, int, int, double);
+double local_energy(mat, double, double, double, int, int, int, double,\
+        double &, double &);
 // prints to screen the results of the calculations
-void  output(int, int, int, mat, mat);
+void output(int, int, int, mat, mat, mat, mat);
 // quantum force for importance sampling
 void quantum_force(int, int, double, double, double, double, mat, mat &);
 
@@ -42,48 +44,59 @@ void quantum_force(int, int, double, double, double, double, mat, mat &);
  * -------------------------------------------------------------------------- */
 int main()
 {
-  int number_cycles = 1000000;                 // number of Monte-Carlo steps  //
+  int number_cycles = 50000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
-  int thermalization = 100;                     // Thermalization steps         //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
-  int number_particles = 2;                   // number of particles          //
+  int number_particles = 6;                   // number of particles          //
   double step_length= 0.1;                    // step length                  //
   mat cumulative_e, cumulative_e2;            // energy-matrices              //
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      //
+  mat kin_e, pot_e;
+  mat kin_e_temp, pot_e_temp;
   double omega = 1.;                         // freq. harm. osc.             //
   int num_threads;                            // number of threads            //
 
   cumulative_e = mat(max_variations+1, max_variations+1, fill::zeros);
   cumulative_e2 = mat(max_variations+1, max_variations+1, fill::zeros);
+  kin_e = mat(max_variations+1, max_variations+1, fill::zeros);
+  pot_e = mat(max_variations+1, max_variations+1, fill::zeros);
+
 
   // ----------------------- MC sampling ------------------------------------ //
-omp_set_num_threads(4);
+//omp_set_num_threads(1);
 #pragma omp parallel shared(cumulative_e_temp, cumulative_e2_temp)
   {
   cumulative_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
   cumulative_e2_temp = mat(max_variations+1, max_variations+1, fill::zeros);
+  kin_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
+  pot_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
   mc_sampling(dimension, number_particles, charge, \
-              max_variations, thermalization, number_cycles, \
-              step_length, cumulative_e_temp, cumulative_e2_temp, omega);
+              max_variations, number_cycles, \
+              step_length, cumulative_e_temp, cumulative_e2_temp, omega, \
+              kin_e_temp, pot_e_temp);
 #pragma omp barrier
 #pragma omp critical
   {
     cumulative_e += cumulative_e_temp;
     cumulative_e2 += cumulative_e2_temp;
+    kin_e += kin_e_temp;
+    pot_e += pot_e_temp;
   }
     num_threads = omp_get_num_threads();
   }
 
   cout << num_threads << endl;
   cumulative_e = cumulative_e/num_threads;
-  cout << cumulative_e << endl;
   cumulative_e2 = cumulative_e2/num_threads;
+  kin_e = kin_e/num_threads;
+  pot_e = pot_e/num_threads;
 
 
   // ------------------------- Output --------------------------------------- //
   ofile.open("vmc.dat");
-  output(max_variations, number_cycles, charge, cumulative_e, cumulative_e2);
+  output(max_variations, number_cycles, charge, cumulative_e, cumulative_e2,\
+          kin_e, pot_e);
   ofile.close();  // close output file
 
 
@@ -97,14 +110,16 @@ omp_set_num_threads(4);
  *             Monte Carlo sampling with the Metropolis algorithm             *
  * -------------------------------------------------------------------------- */
 void mc_sampling(int dimension, int number_particles, int charge,
-                 int max_variations,
-                 int thermalization, int number_cycles, double step_length,
-                 mat &cumulative_e, mat &cumulative_e2, double omega){
+                 int max_variations, int number_cycles, double step_length,
+                 mat &cumulative_e, mat &cumulative_e2, double omega,
+                 mat &kin_e, mat &pot_e){
 
   int cycles, variate, variate2, accept, i, j, k, thread;
   long idum;
   double alpha, beta, energy, energy2, delta_e, wfold, wfnew;
-  double D, greensfunction;
+  double D, greensfunction, del_kin_e, del_pot_e;
+  double kinetic_energy, potential_energy;
+
   D = 0.5; 
   alpha = abegin*charge;
   idum=-1;
@@ -122,34 +137,36 @@ void mc_sampling(int dimension, int number_particles, int charge,
       beta = bbegin*charge;
       for (variate2 = 1; variate2 <= max_variations; variate2++){
           beta += bstep;
-          energy = energy2 = 0; accept = 0; delta_e = 0;
+          energy = energy2 = kinetic_energy = potential_energy = 0; 
+          accept = 0; delta_e = 0;
           system.SetVariables(alpha, beta);
 
           //  initial trial position
           for (i = 0; i < number_particles; i++) {
             for (j = 0; j < dimension; j++) {
-//              r_old(i,j) = step_length*(ran2(&idum)-0.5);
+//             r_old(i,j) = step_length*(ran2(&idum)-0.5);
               r_old(i,j) = gaussian_deviate(&idum)*sqrt(step_length);
             }
           }
 
           system.SetPosition(r_old);
-          //wfold = system.SixElectronSystem();
-          wfold = system.PerturbedWavefunction();
+          wfold = system.SixElectronSystem();
+          //wfold = system.PerturbedWavefunction();
           //wfold = particle_old.UnperturbedWavefunction();
 
           quantum_force(number_particles, dimension, alpha, beta, omega, \
                   wfold, r_old, qforce_old);
 
           // -------------- loop over monte carlo cycles -------------------- //
-          for (cycles = 1; cycles <= number_cycles+thermalization; cycles++){
+          for (cycles = 1; cycles <= number_cycles; cycles++){
             // new position
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
 //                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
-                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)* //sqrt(step_length)
-                             + step_length*D*qforce_old(i,j);// 
+                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*sqrt(step_length)
+                           + step_length*D*qforce_old(i,j);
               }
+//            }
               
               // we move only one particle at the time
               for (k = 0; k < number_particles; k++) {
@@ -170,39 +187,50 @@ void mc_sampling(int dimension, int number_particles, int charge,
               
               // ------------------ greensfunction ---------------------------- //
               greensfunction = 0.0;
+//            for (i = 0; i < number_particles; i++){
               for (j = 0; j < dimension; j++) {
                   greensfunction += 0.5*(qforce_old(i,j) + qforce_new(i,j))* \
                      (D*step_length*0.5*(qforce_old(i,j) - qforce_new(i,j))- \
                       r_new(i,j) + r_old(i,j));
               }
+//              }
               greensfunction = exp(greensfunction);
 
 //              greensfunction = 1.;
               // ----------------- metropolis test ---------------------------- //
               if (ran2(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
+//                  for (i = 0; i < number_particles; i++) {
                   for (j = 0; j < dimension; j++){
                       r_old(i,j) = r_new(i,j);
                       qforce_old(i,j) = qforce_new(i,j); 
                   }
+//                  }
               wfold = wfnew;
               accept = accept + 1;
               }
+//              else {
+//                  cout << omp_get_thread_num()<< setw(14)<< greensfunction*wfnew*wfnew/wfold/wfold << setw(14) <<
+//                    greensfunction << setw(14) << wfnew << setw(14) << wfold <<  endl;
+//              }
             }
 
             // ----------------- local energy ------------------------------- //
-            if (cycles > thermalization) {
-              delta_e = local_energy(r_old, alpha, beta, wfold, dimension,
-                                     number_particles, charge, omega);
-              // update energies
-              energy += delta_e;
-              energy2 += delta_e*delta_e;
-            }
+            delta_e = local_energy(r_old, alpha, beta, wfold, dimension,
+                                   number_particles, charge, omega, \
+                                   del_kin_e, del_pot_e);
+            // update energies
+            energy += delta_e;
+            energy2 += delta_e*delta_e;
+            kinetic_energy += del_kin_e;
+            potential_energy += del_pot_e;
           }
           // ------------- end loop over monte carlo cycles ----------------- //
 
           // update the energy average and its squared
           cumulative_e(variate, variate2) = energy/number_cycles;
           cumulative_e2(variate, variate2) = energy2/number_cycles;
+          kin_e(variate, variate2) = kinetic_energy/number_cycles;
+          pot_e(variate, variate2) = potential_energy/number_cycles;
 
           thread = omp_get_thread_num();
 #pragma omp critical
@@ -211,6 +239,8 @@ void mc_sampling(int dimension, int number_particles, int charge,
                << "beta = " << beta << setw(20)
                << "accepted steps = " << accept << setw(20)
                << "energy = " << cumulative_e(variate,variate2) << setw(20)
+               << "kin. energy = " << kin_e(variate,variate2) << setw(20)
+               << "pot. energy = " << pot_e(variate,variate2) << setw(20)
                << "thread = " << thread << endl;
           }
       }
@@ -229,14 +259,10 @@ void quantum_force(int number_particles, int dimension, double alpha, \
     r_plus = zeros<mat>(number_particles,dimension);
     r_minus = zeros<mat>(number_particles,dimension);
     ManyBody system(alpha, beta, dimension, number_particles, omega);
-    Slater slater_mat();
 
-    slater_mat.SetupSixElectron();
-    //slater_mat.SetupTwoElectron();
-    slater_mat.InitInverseSlaterMatrices();
-    
 
-    qforce(i,k) = 2.*(grad_slater(i,k) + grad_jastrow(i,k);
+//    // \todo{implement here grad_slater and grad_jastrow!}
+//    qforce(i,k) = 2.*(grad_slater(i,k) + grad_jastrow(i,k);
 
 //    // closed-form two particles
 //    a = 1.0;
@@ -248,30 +274,37 @@ void quantum_force(int number_particles, int dimension, double alpha, \
 //                r_12 += (r(i,k)-r(j,k))*(r(i,k)-r(j,k));
 //            }
 //            r_12 = sqrt(r_12);
-//
-//    // quantum the first derivative
-//    for (i = 0; i < number_particles; i++){
-//        for (j = 0; j < dimension; j++){
-//            r_plus(i,j) = r(i,j) + h;
-//            r_minus(i,j) = r(i,j) - h;
-//            system.SetPosition(r_minus);
-//            wfminus = system.PerturbedWavefunction();
-//           // wfminus = system.SixElectronSystem();
-//            system.SetPosition(r_plus);
-//            wfplus = system.PerturbedWavefunction();
-//            //wfplus = system.SixElectronSystem();
-//            qforce(i,j) = (wfplus - wfminus)/(wf*h);
-//            r_plus(i,j) = r(i,j);
-//            r_minus(i,j) = r(i,j);
-//        }
-//    }
+
+    for(i = 0 ; i < number_particles; i++) {
+        for (j = 0; j < dimension ; j++) {
+            r_plus(i,j) = r_minus(i,j) = r(i,j);
+        }
+    }
+
+    // quantum the first derivative
+    for (i = 0; i < number_particles; i++){
+        for (j = 0; j < dimension; j++){
+            r_plus(i,j) = r(i,j) + h;
+            r_minus(i,j) = r(i,j) - h;
+            system.SetPosition(r_minus);
+            //wfminus = system.PerturbedWavefunction();
+            wfminus = system.SixElectronSystem();
+            system.SetPosition(r_plus);
+            //wfplus = system.PerturbedWavefunction();
+            wfplus = system.SixElectronSystem();
+            qforce(i,j) = (wfplus - wfminus)/(wf*h);
+            r_plus(i,j) = r(i,j);
+            r_minus(i,j) = r(i,j);
+        }
+    }
 }
 
 /* -------------------------------------------------------------------------- *
  *        Function to calculate the local energy with num derivative          *
  * -------------------------------------------------------------------------- */
-double  local_energy(mat r, double alpha, double beta, double wfold,\
-          int dimension, int number_particles, int charge, double omega)
+double local_energy(mat r, double alpha, double beta, double wfold,\
+          int dimension, int number_particles, int charge, double omega,\
+          double &kin_e, double &pot_e)
 {
   int i, j , k;
   double e_local, e_kinetic, e_potential, r_12, r_single_particle;
@@ -299,11 +332,11 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
       r_minus(i,j) = r(i,j) - h;
 
       system.SetPosition(r_minus);
-      wfminus = system.PerturbedWavefunction();
-      //wfminus = system.SixElectronSystem();
+      //wfminus = system.PerturbedWavefunction();
+      wfminus = system.SixElectronSystem();
       system.SetPosition(r_plus);
-      wfplus = system.PerturbedWavefunction();
-      //wfplus = system.SixElectronSystem();
+      //wfplus = system.PerturbedWavefunction();
+      wfplus = system.SixElectronSystem();
 
       e_kinetic -= (wfminus + wfplus - 2.*wfold);
       r_plus(i,j) = r(i,j);
@@ -341,6 +374,8 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
   }
 
   // -------------------------- total energy -------------------------------- //
+  kin_e = e_kinetic;
+  pot_e = e_potential;
   e_local = e_potential + e_kinetic;
   return e_local;
 }
@@ -348,7 +383,7 @@ double  local_energy(mat r, double alpha, double beta, double wfold,\
 
 // output function
 void output(int max_variations, int number_cycles, int charge, \
-        mat cumulative_e, mat cumulative_e2)
+        mat cumulative_e, mat cumulative_e2, mat kin_e, mat pot_e)
 {
   int i, j;
   double alpha, beta, variance, error;
@@ -356,8 +391,10 @@ void output(int max_variations, int number_cycles, int charge, \
   ofile << setw(15) << "alpha";
   ofile << setw(15) << "beta";
   ofile << setw(15) << "cumulative_e(i,j)";
-  ofile << setw(15) << "variance";
-  ofile << setw(15) << "error" << endl;
+  ofile << setw(15) << "kinetic energy";
+  ofile << setw(15) << "potential energy"; 
+  ofile << setw(15) << "variance (cum_e)";
+  ofile << setw(15) << "error (cum_e)" << endl;
   for(i = 1; i <= max_variations; i++){
       alpha += astep;
       beta = bbegin;
@@ -369,6 +406,8 @@ void output(int max_variations, int number_cycles, int charge, \
           ofile << setw(15) << setprecision(8) << alpha;
           ofile << setw(15) << setprecision(8) << beta;
           ofile << setw(15) << setprecision(8) << cumulative_e(i,j);
+          ofile << setw(15) << setprecision(8) << kin_e(i,j);
+          ofile << setw(15) << setprecision(8) << pot_e(i,j);
           ofile << setw(15) << setprecision(8) << variance;
           ofile << setw(15) << setprecision(8) << error << endl;
       }

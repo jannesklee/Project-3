@@ -42,12 +42,12 @@ void quantum_force(int, int, double, double, double, double, mat, mat &);
  * -------------------------------------------------------------------------- */
 int main()
 {
-  int number_cycles = 50000;                 // number of Monte-Carlo steps  //
+  int number_cycles = 100000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 6;                   // number of particles          //
-  double step_length= 0.1;                    // step length                  //
+  double step_length= 0.1;                    // either f. br.for. or imp.samp//
   mat cumulative_e, cumulative_e2;            // energy-matrices              //
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      //
   mat kin_e, pot_e;
@@ -63,7 +63,7 @@ int main()
 
   // ----------------------- MC sampling ------------------------------------ //
 //omp_set_num_threads(1);
-#pragma omp parallel shared(cumulative_e_temp, cumulative_e2_temp)
+#pragma omp parallel //shared(cumulative_e_temp, cumulative_e2_temp)
   {
   cumulative_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
   cumulative_e2_temp = mat(max_variations+1, max_variations+1, fill::zeros);
@@ -143,7 +143,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
           for (i = 0; i < number_particles; i++) {
             for (j = 0; j < dimension; j++) {
 //             r_old(i,j) = step_length*(ran2(&idum)-0.5);
-              r_old(i,j) = gaussian_deviate(&idum)*sqrt(step_length);
+              r_old(i,j) = gaussian_deviate(&idum);//*sqrt(step_length);
             }
           }
 
@@ -207,6 +207,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
               accept = accept + 1;
               }
 //              else {
+//                  cout << r_old << endl; 
 //                  cout << omp_get_thread_num()<< setw(14)<< greensfunction*wfnew*wfnew/wfold/wfold << setw(14) <<
 //                    greensfunction << setw(14) << wfnew << setw(14) << wfold <<  endl;
 //              }

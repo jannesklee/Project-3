@@ -86,7 +86,9 @@ vec SingleParticle::GetGradient() {
     vec slater_grad;
     double c;
 
-    c = m_omega*m_alpha
+    slater_grad = vec(m_dimension); 
+
+    c = m_omega*m_alpha;
     if (m_nx == 0 && m_ny == 0) {
         slater_grad(0) = -c*m_r(0);
         slater_grad(1) = -c*m_r(1);
@@ -104,20 +106,25 @@ vec SingleParticle::GetGradient() {
     return slater_grad;
 }
 
-void SingleParticle::GetLaplacian() {
-    double laplacian; 
+double SingleParticle::GetLaplacian() {
+    double slater_lap; 
     double r_single_particle2;
+    double c;
 
+    c = m_omega*m_alpha;
     r_single_particle2 = m_r(0)*m_r(0) + m_r(1)*m_r(1);
+    slater_lap = 0;
   
     if (m_nx == 0 && m_ny == 0){
-        slater_lap = c*(c*r_single_particle2 - 2.)
+        slater_lap = c*(c*r_single_particle2 - 2.);
     }
     else if (m_nx == 1 && m_ny == 0) {
-        slater_lap = c*m_r(0)*(c*r_single_particle2 - 4.)
+        slater_lap = c*m_r(0)*(c*r_single_particle2 - 4.);
     }
-    else if (m_nx == 0 && m_ny == 1) {
-        slater_lap = c*m_r(1)*(c*r_single_particle2 - 4.)
+    else if(m_nx == 0 && m_ny == 1) {
+        slater_lap = c*m_r(1)*(c*r_single_particle2 - 4.);
+    }
+    else{
     }
 
     slater_lap = slater_lap*exp(-0.5*c*(m_r(0)*m_r(0)+m_r(1)*m_r(1)));

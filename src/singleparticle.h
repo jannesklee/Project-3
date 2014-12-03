@@ -19,8 +19,8 @@ class SingleParticle
         void SetAll(vec r, int nx, int ny, int dimension, double omega,\
                 double alpha);
         double Wavefunction();
-        vec GetGradient(int nx, int ny);
-        double GetLaplacian(int nx, int ny);
+        vec GetGradient();
+        double GetLaplacian();
 };
 
 #endif // SINGLEPARTICLE_H

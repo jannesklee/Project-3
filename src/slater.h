@@ -4,8 +4,7 @@
 
 using namespace arma;
 
-
-class InvSlater
+class Slater
 {
     private:
         mat m_slater_up;
@@ -21,9 +20,13 @@ class InvSlater
         Slater();
         Slater(mat r, double alpha, double beta, int dimension, \
         int number_particles, double omega);
+
         void SetupSixElectron();
+        void SetupTwoElectron();
+        void SetPosition(mat r); 
+        mat Gradient(int i);
         void InitInverseSlaterMatrices();
         void UpdateInverseSlaterMatrices();
-}
+};
 
 #endif // SLATER_H

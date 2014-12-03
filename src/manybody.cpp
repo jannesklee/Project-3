@@ -53,7 +53,6 @@ void ManyBody::SetVariables(double alpha, double beta) {
 
 
 // ------------------------- wavefunctions ---------------------------------- //
-ManyBody::ManyBody()
 double ManyBody::UnperturbedWavefunction()
 {
   int i, j;

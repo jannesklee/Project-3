@@ -23,11 +23,11 @@ class Jastrow
 
         // calculates derivatives
         void UpdateDerivatives();
-        mat JastrowFirstDerivative();
-        double JastrowSecondDerivative();
+        vec Gradient(int);
+        double Laplacian();
 
         // getters, setters
-        mat GetGradient();
+        vec GetGradient();
         double GetLaplacianSum();
 };
 

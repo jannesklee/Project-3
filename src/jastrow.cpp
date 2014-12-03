@@ -21,13 +21,7 @@ Jastrow::Jastrow(mat r, double alpha, double beta, int dimension, \
     m_omega = omega;
 }
 
-void Jastrow::UpdateDerivatives()
-{
-    m_jastrow_grad = Jastrow::GetGradient();
-    m_jastrow_lap  = Jastrow::GetLaplacianSum();
-}
-
-mat Jastrow::GetGradient()
+vec Jastrow::GetGradient()
 {
     return m_jastrow_grad;
 }
@@ -38,23 +32,26 @@ double Jastrow::GetLaplacianSum()
 }
 
 //! \brief{Gradient of the Jastrow-Ratio}
-mat Jastrow::JastrowFirstDerivative()
+vec Jastrow::Gradient(int particle_ind)
 {
-    int i, j, k;
+    int j, k;
     double r_12, r_12_comp;
     double a;
 
-    for (i = 0; i < m_number_particles-1; i++) { 
-        for (j = i+1; j < m_number_particles; j++) {
+    m_jastrow_grad = vec(m_dimension);
+
+    for (j = 0; j < m_number_particles; j++) {
+        if (j != particle_ind) {
             // loop over dimensions to evaluate distance
             r_12 = 0;
             for (k = 0; k < m_dimension; k++) {
-                r_12 += (m_r(i,k)-m_r(j,k))*(m_r(i,k)-m_r(j,k));
+                r_12 += (m_r(particle_ind,k)-m_r(j,k))*\
+                        (m_r(particle_ind,k)-m_r(j,k));
             }
             r_12 = sqrt(r_12);
 
             // evaluate a for parallel or antiparallel spin
-            if ((i+j)%2 == 0) { 
+            if ((particle_ind+j)%2 == 0) { 
                 a = 1./3.;
             }
             else {
@@ -64,8 +61,9 @@ mat Jastrow::JastrowFirstDerivative()
             // loop over dimensions to determine the jastro_factor
             r_12_comp = 0.;
             for (k = 0; k < m_dimension; k++) {
-                r_12_comp += m_r(i,k)-m_r(j,k); // distance of one component
-                m_jastrow_grad(i,k) = a*r_12_comp / (r_12*(1. + m_beta*r_12)*(1. + m_beta*r_12));
+                r_12_comp += m_r(particle_ind,k)-m_r(j,k); // distance of one component
+                m_jastrow_grad(k) += 
+                    a*r_12_comp / (r_12*(1. + m_beta*r_12)*(1. + m_beta*r_12));
             }
         }
     }
@@ -74,7 +72,7 @@ mat Jastrow::JastrowFirstDerivative()
 }
 
 //! \brief{Sum over particles of Laplacian of Jastro-factor}
-double Jastrow::JastrowSecondDerivative()
+double Jastrow::Laplacian()
 {
     int i, j, k;
     double r_12;

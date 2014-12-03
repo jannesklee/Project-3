@@ -10,6 +10,7 @@
 #include "singleparticle.h"  //class for single particles
 #include "manybody.h" //class for many-body problems
 #include "jastrow.h" //class for derivations of jastrow factor
+#include "slater.h"
 //#include <mpi.h>
 
 using namespace  std;
@@ -29,23 +30,26 @@ ofstream ofile;
  *                        Declaration of functions                            *
  * -------------------------------------------------------------------------- */
 // The Mc sampling for the variational Monte Carlo
-void mc_sampling(int, int, int, int, int, double, mat &, mat &, double,\
+void mc_sampling(int, int, int, int, int, int, double, mat &, mat &, double,\
         mat &, mat &);
 // The local energy
 double local_energy(mat, double, double, double, int, int, int, double,\
-        double &, double &);
+        double &, double &, int);
 // prints to screen the results of the calculations
 void output(int, int, int, mat, mat, mat, mat);
 // quantum force for importance sampling
-void quantum_force(int, int, double, double, double, double, mat, mat &);
+void quantum_force(int, int, double, double, double, double, mat, mat &, int);
+// qunatum force init
+void quantum_force_init(int, int, double, double, double, double, mat, mat &);
 
 /* -------------------------------------------------------------------------- *
  *                        Begin of main program                               *
  * -------------------------------------------------------------------------- */
 int main()
 {
-  int number_cycles = 50000;                 // number of Monte-Carlo steps  //
+  int number_cycles = 100000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
+  int thermalization = 10000; 
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 6;                   // number of particles          //
@@ -72,7 +76,7 @@ int main()
   kin_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
   pot_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
   mc_sampling(dimension, number_particles, charge, \
-              max_variations, number_cycles, \
+              max_variations, number_cycles, thermalization, \
               step_length, cumulative_e_temp, cumulative_e2_temp, omega, \
               kin_e_temp, pot_e_temp);
 #pragma omp barrier
@@ -110,7 +114,7 @@ int main()
  *             Monte Carlo sampling with the Metropolis algorithm             *
  * -------------------------------------------------------------------------- */
 void mc_sampling(int dimension, int number_particles, int charge,
-                 int max_variations, int number_cycles, double step_length,
+                 int max_variations, int number_cycles, int thermalization, double step_length,
                  mat &cumulative_e, mat &cumulative_e2, double omega,
                  mat &kin_e, mat &pot_e){
 
@@ -154,11 +158,12 @@ void mc_sampling(int dimension, int number_particles, int charge,
           //wfold = system.PerturbedWavefunction();
           //wfold = particle_old.UnperturbedWavefunction();
 
-          quantum_force(number_particles, dimension, alpha, beta, omega, \
+          i = 0; 
+          quantum_force_init(number_particles, dimension, alpha, beta, omega, \
                   wfold, r_old, qforce_old);
 
           // -------------- loop over monte carlo cycles -------------------- //
-          for (cycles = 1; cycles <= number_cycles; cycles++){
+          for (cycles = 1; cycles <= number_cycles + thermalization; cycles++){
             // new position
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
@@ -178,12 +183,12 @@ void mc_sampling(int dimension, int number_particles, int charge,
               }
 
               system.SetPosition(r_new);
-              //wfnew = system.SixElectronSystem();
+              wfnew = system.SixElectronSystem();
               //wfnew = system.PerturbedWavefunction();
-              wfnew= system.PerturbedWavefunction();
+              //wfnew= system.PerturbedWavefunction();
               
               quantum_force(number_particles, dimension, alpha, beta, omega,\
-                      wfnew, r_new, qforce_new);
+                      wfnew, r_new, qforce_new, i);
               
               // ------------------ greensfunction ---------------------------- //
               greensfunction = 0.0;
@@ -208,21 +213,19 @@ void mc_sampling(int dimension, int number_particles, int charge,
               wfold = wfnew;
               accept = accept + 1;
               }
-//              else {
-//                  cout << omp_get_thread_num()<< setw(14)<< greensfunction*wfnew*wfnew/wfold/wfold << setw(14) <<
-//                    greensfunction << setw(14) << wfnew << setw(14) << wfold <<  endl;
-//              }
             }
 
             // ----------------- local energy ------------------------------- //
-            delta_e = local_energy(r_old, alpha, beta, wfold, dimension,
-                                   number_particles, charge, omega, \
-                                   del_kin_e, del_pot_e);
-            // update energies
-            energy += delta_e;
-            energy2 += delta_e*delta_e;
-            kinetic_energy += del_kin_e;
-            potential_energy += del_pot_e;
+            if (cycles > thermalization){
+                delta_e = local_energy(r_old, alpha, beta, wfold, dimension,
+                                       number_particles, charge, omega, \
+                                       del_kin_e, del_pot_e, i);
+                // update energies
+                energy += delta_e;
+                energy2 += delta_e*delta_e;
+                kinetic_energy += del_kin_e;
+                potential_energy += del_pot_e;
+            }
           }
           // ------------- end loop over monte carlo cycles ----------------- //
 
@@ -249,20 +252,26 @@ void mc_sampling(int dimension, int number_particles, int charge,
 
 
 void quantum_force(int number_particles, int dimension, double alpha, \
-        double beta, double omega, double wf, mat r, mat &qforce)
+        double beta, double omega, double wf, mat r, mat &qforce, \
+        int particle_ind)
 {
-    int i, j, k;
-    double wfminus , wfplus;
-    mat r_plus, r_minus;
-    double a, r_12, r_12_comp;
+    int k;
+    vec grad_slater, grad_jastrow;
+    (void) wf; 
 
-    r_plus = zeros<mat>(number_particles,dimension);
-    r_minus = zeros<mat>(number_particles,dimension);
-    ManyBody system(alpha, beta, dimension, number_particles, omega);
+    // Setup Slater Determinant
+    Slater slater_obj(r, alpha, beta, dimension, number_particles, omega);
+    slater_obj.SetupSixElectron();
+//    slater_obj.SetupTwoElectron();
+    grad_slater = slater_obj.Gradient(particle_ind); 
 
+    // Setup Jastrow
+    Jastrow jastrow_obj(r, alpha, beta, dimension, number_particles, omega);
+    grad_jastrow = jastrow_obj.Gradient(particle_ind);
 
-//    // \todo{implement here grad_slater and grad_jastrow!}
-//    qforce(i,k) = 2.*(grad_slater(i,k) + grad_jastrow(i,k);
+    for(k = 0; k < dimension; k++) {
+        qforce(particle_ind,k) = 2.*(grad_slater(k) + grad_jastrow(k));
+    }
 
 //    // closed-form two particles
 //    a = 1.0;
@@ -275,28 +284,63 @@ void quantum_force(int number_particles, int dimension, double alpha, \
 //            }
 //            r_12 = sqrt(r_12);
 
-    for(i = 0 ; i < number_particles; i++) {
-        for (j = 0; j < dimension ; j++) {
-            r_plus(i,j) = r_minus(i,j) = r(i,j);
+}
+
+void quantum_force_init(int number_particles, int dimension, double alpha, \
+        double beta, double omega, double wf, mat r, mat &qforce)
+{
+    int k, particle_ind;
+    vec grad_slater, grad_jastrow;
+    (void) wf; 
+
+    // Setup Slater
+    Slater slater_obj(r, alpha, beta, dimension, number_particles, omega);
+    slater_obj.SetupSixElectron();
+//    slater_obj.SetupTwoElectron();
+//
+    // Setup Jastrow
+    Jastrow jastrow_obj(r, alpha, beta, dimension, number_particles, omega);
+
+    for (particle_ind = 0; particle_ind < number_particles; particle_ind++) {
+        grad_slater = slater_obj.Gradient(particle_ind); 
+        grad_jastrow = jastrow_obj.Gradient(particle_ind);
+
+        for(k = 0; k < dimension; k++) {
+            qforce(particle_ind,k) = 2.*(grad_slater(k) + grad_jastrow(k));
         }
     }
 
-    // quantum the first derivative
-    for (i = 0; i < number_particles; i++){
-        for (j = 0; j < dimension; j++){
-            r_plus(i,j) = r(i,j) + h;
-            r_minus(i,j) = r(i,j) - h;
-            system.SetPosition(r_minus);
-            //wfminus = system.PerturbedWavefunction();
-            wfminus = system.SixElectronSystem();
-            system.SetPosition(r_plus);
-            //wfplus = system.PerturbedWavefunction();
-            wfplus = system.SixElectronSystem();
-            qforce(i,j) = (wfplus - wfminus)/(wf*h);
-            r_plus(i,j) = r(i,j);
-            r_minus(i,j) = r(i,j);
-        }
-    }
+
+//    int i, j;
+//    double wfminus , wfplus;
+//    mat r_plus, r_minus;
+//
+//    r_plus = zeros<mat>(number_particles,dimension);
+//    r_minus = zeros<mat>(number_particles,dimension);
+//    ManyBody system(alpha, beta, dimension, number_particles, omega);
+//
+//    for(i = 0 ; i < number_particles; i++) {
+//        for (j = 0; j < dimension ; j++) {
+//            r_plus(i,j) = r_minus(i,j) = r(i,j);
+//        }
+//    }
+//
+//    // quantum the first derivative
+//    for (i = 0; i < number_particles; i++){
+//        for (j = 0; j < dimension; j++){
+//            r_plus(i,j) = r(i,j) + h;
+//            r_minus(i,j) = r(i,j) - h;
+//            system.SetPosition(r_minus);
+//            //wfminus = system.PerturbedWavefunction();
+//            wfminus = system.SixElectronSystem();
+//            system.SetPosition(r_plus);
+//            //wfplus = system.PerturbedWavefunction();
+//            wfplus = system.SixElectronSystem();
+//            qforce(i,j) = (wfplus - wfminus)/(wf*h);
+//            r_plus(i,j) = r(i,j);
+//            r_minus(i,j) = r(i,j);
+//        }
+//    }
 }
 
 /* -------------------------------------------------------------------------- *
@@ -304,12 +348,13 @@ void quantum_force(int number_particles, int dimension, double alpha, \
  * -------------------------------------------------------------------------- */
 double local_energy(mat r, double alpha, double beta, double wfold,\
           int dimension, int number_particles, int charge, double omega,\
-          double &kin_e, double &pot_e)
+          double &kin_e, double &pot_e, int particle)
 {
   int i, j , k;
   double e_local, e_kinetic, e_potential, r_12, r_single_particle;
   double wfminus, wfplus;
   (void) charge;
+  (void) particle; 
   mat r_plus,r_minus;
   ManyBody system(r_minus, alpha, beta, dimension, number_particles, omega);
 
@@ -345,12 +390,6 @@ double local_energy(mat r, double alpha, double beta, double wfold,\
   }
   // include electron mass and hbar squared and divide by wave function
   e_kinetic = 0.5*h2*e_kinetic/wfold;
-
-  // closed-form solution for kinetic energy
-  e_kinetic = 0.;
-  for (i = 0; i < number_particles; i++) {
-    
-  }
 
   // ---------------------- potential energy -------------------------------- //
   e_potential = 0;

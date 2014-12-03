@@ -1,6 +1,6 @@
 TARGET = main.out
 CC = c++
-CFLAGS = -Wall -Wextra -llapack -lblas -larmadillo -fopenmp -Isrc -O2 $(DEBUG)
+CFLAGS = -Wall -Wextra -llapack -lblas -larmadillo -fopenmp -Isrc -O3 $(DEBUG)
 DEBUG = -g
 
 SRCDIR = src

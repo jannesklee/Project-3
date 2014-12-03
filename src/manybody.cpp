@@ -129,7 +129,7 @@ double ManyBody::SixElectronSystem()
     }
 
     // calculates the relative distance 
-    psi_c = 1.0;
+    psi_c = 0.0;
     for (i = 0; i < m_number_particles-1; i++) { 
         for (j = i+1; j < m_number_particles; j++) {
             r_12 = 0;
@@ -144,9 +144,10 @@ double ManyBody::SixElectronSystem()
                 a = 1.;
             }
             r_12 = sqrt(r_12);
-            psi_c = psi_c * exp(a*r_12/(1. + m_beta*r_12));
+            psi_c += a*r_12/(1. + m_beta*r_12);
         }
     }
+    psi_c = exp(psi_c); 
 
     // ------------------------ Unpurturbed part ---------------------------- //
     // spin-up particles
@@ -193,7 +194,10 @@ double ManyBody::SixElectronSystem()
     
     det_slater_up = det(slater_up);
     det_slater_down = det(slater_down);
-
+//#pragma omp critical
+//    {    
+//    cout << det_slater_up << setw(15) << det_slater_down << setw(15) << psi_c << endl; 
+//    }
 
     // ---------------------- calculate wavefunction ------------------------ //
     

@@ -56,7 +56,6 @@ double SingleParticle::Wavefunction()
 
   // ------------------------ hermite's polynomials ------------------------- //
   // for x-direction
-  // TODO: delete normalizations
   if (m_nx==0){
       hermite1 = 1.;
   }

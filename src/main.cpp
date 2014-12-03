@@ -53,7 +53,7 @@ int main()
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 6;                   // number of particles          //
-  double step_length= 0.1;                    // step length                  //
+  double step_length= 0.1;                    // either f. br.for. or imp.samp//
   mat cumulative_e, cumulative_e2;            // energy-matrices              //
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      //
   mat kin_e, pot_e;
@@ -149,7 +149,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
           for (i = 0; i < number_particles; i++) {
             for (j = 0; j < dimension; j++) {
 //             r_old(i,j) = step_length*(ran2(&idum)-0.5);
-              r_old(i,j) = gaussian_deviate(&idum)*sqrt(step_length);
+              r_old(i,j) = gaussian_deviate(&idum);//*sqrt(step_length);
             }
           }
 
@@ -161,13 +161,14 @@ void mc_sampling(int dimension, int number_particles, int charge,
           i = 0; 
           quantum_force_init(number_particles, dimension, alpha, beta, omega, \
                   wfold, r_old, qforce_old);
+//          qforce_old.zeros();
 
           // -------------- loop over monte carlo cycles -------------------- //
           for (cycles = 1; cycles <= number_cycles + thermalization; cycles++){
             // new position
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
-//                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
+//              r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
                 r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*sqrt(step_length)
                            + step_length*D*qforce_old(i,j);
               }
@@ -189,6 +190,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
               
               quantum_force(number_particles, dimension, alpha, beta, omega,\
                       wfnew, r_new, qforce_new, i);
+//              qforce_new.zeros();
               
               // ------------------ greensfunction ---------------------------- //
               greensfunction = 0.0;

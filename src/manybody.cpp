@@ -58,17 +58,14 @@ double ManyBody::PerturbedWavefunction()
 
 double ManyBody::SixElectronSystem()
 {
-    // TODO: the matrix m_r is not coupled to the vecotrs m_r in singleparticle
-    // this might get into trouble if only one of these things is done
     int i, j, k, red_slater_size;
-    double a, wf, argument, r_single_particle, r_12;
-    double psi_c;
+    double a, wf, argument, r_single_particle, r_12, psi_c;
+    double det_slater_up, det_slater_down;
     mat slater_up, slater_down;
-    red_slater_size = m_number_particles/2;  // needs an even amount of particles
     vec m_r1, m_r2, m_r3, m_r4, m_r5, m_r6;
     SingleParticle particle[6];
-    double det_slater_up, det_slater_down;
 
+    red_slater_size = m_number_particles/2;  
     slater_up = mat(red_slater_size, red_slater_size);  
     slater_down = mat(red_slater_size, red_slater_size);
 
@@ -113,11 +110,11 @@ double ManyBody::SixElectronSystem()
     particle[4].SetAll(conv_to<vec>::from(m_r.row(0)), 0, 1, m_dimension,\
             m_omega, m_alpha);
     // spin-down particles
-    particle[1].SetAll(conv_to<vec>::from(m_r.row(3)), 0, 0, m_dimension,\
+    particle[1].SetAll(conv_to<vec>::from(m_r.row(m_number_particles/2)), 0, 0, m_dimension,\
             m_omega, m_alpha);
-    particle[3].SetAll(conv_to<vec>::from(m_r.row(3)), 1, 0, m_dimension,\
+    particle[3].SetAll(conv_to<vec>::from(m_r.row(m_number_particles/2)), 1, 0, m_dimension,\
             m_omega, m_alpha);
-    particle[5].SetAll(conv_to<vec>::from(m_r.row(3)), 0, 1, m_dimension,\
+    particle[5].SetAll(conv_to<vec>::from(m_r.row(m_number_particles/2)), 0, 1, m_dimension,\
             m_omega, m_alpha);
 
     // filling of slater matrix
@@ -127,7 +124,7 @@ double ManyBody::SixElectronSystem()
             particle[i*2].SetPosition(conv_to<vec>::from(m_r.row(j))); 
             slater_up(i,j) = particle[i*2].Wavefunction();
             // spin down
-            particle[i*2+1].SetPosition(conv_to<vec>::from(m_r.row(j+3))); 
+            particle[i*2+1].SetPosition(conv_to<vec>::from(m_r.row(j+m_number_particles/2))); 
             slater_down(i,j) = particle[i*2+1].Wavefunction();
         }
     }

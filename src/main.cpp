@@ -18,8 +18,8 @@ ofstream ofile;
 // the step length and its squared inverse for the second derivative
 #define h 0.001
 #define h2 1000000
-#define abegin 0.96
-#define bbegin 0.36
+#define abegin 0.9
+#define bbegin 0.3
 #define astep 0.04
 #define bstep 0.04
 
@@ -42,11 +42,11 @@ void quantum_force(int, int, double, double, double, double, mat, mat &);
  * -------------------------------------------------------------------------- */
 int main()
 {
-  int number_cycles = 50000;                 // number of Monte-Carlo steps  //
+  int number_cycles = 100000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
-  int number_particles = 6;                   // number of particles          //
+  int number_particles = 2;                   // number of particles          //
   double step_length= 0.1;                    // either f. br.for. or imp.samp//
   mat cumulative_e, cumulative_e2;            // energy-matrices              //
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      //
@@ -119,7 +119,6 @@ void mc_sampling(int dimension, int number_particles, int charge,
   double kinetic_energy, potential_energy;
 
   D = 0.5; 
-  alpha = abegin*charge;
   idum=-1;
 
   // initial positions, initial forces
@@ -129,12 +128,11 @@ void mc_sampling(int dimension, int number_particles, int charge,
   mat qforce_new = zeros<mat>(number_particles, dimension);
   ManyBody system(dimension, number_particles, omega);
 
+  alpha = abegin*charge;
   // -------------- Loop over different values of alpha, beta --------------- //
   for (variate = 1; variate <= max_variations; variate++){
-      alpha += astep;
       beta = bbegin*charge;
       for (variate2 = 1; variate2 <= max_variations; variate2++){
-          beta += bstep;
           energy = energy2 = kinetic_energy = potential_energy = 0; 
           accept = 0; delta_e = 0;
           system.SetVariables(alpha, beta);
@@ -149,7 +147,6 @@ void mc_sampling(int dimension, int number_particles, int charge,
 
           system.SetPosition(r_old);
           wfold = system.SixElectronSystem();
-          //wfold = system.PerturbedWavefunction();
           //wfold = particle_old.UnperturbedWavefunction();
 
           quantum_force(number_particles, dimension, alpha, beta, omega, \
@@ -178,7 +175,6 @@ void mc_sampling(int dimension, int number_particles, int charge,
 
               system.SetPosition(r_new);
               wfnew = system.SixElectronSystem();
-              //wfnew = system_new.PerturbedWavefunction();
               //wfnew= particle_new.UnperturbedWavefunction();
               
               quantum_force(number_particles, dimension, alpha, beta, omega,\
@@ -239,7 +235,9 @@ void mc_sampling(int dimension, int number_particles, int charge,
                << "pot. energy = " << pot_e(variate,variate2) << setw(20)
                << "thread = " << thread << endl;
           }
+          beta += bstep;
       }
+      alpha += astep;
   }    // end of loop over variational  steps
 }   // end mc_sampling function
 
@@ -267,10 +265,8 @@ void quantum_force(int number_particles, int dimension, double alpha, \
             r_plus(i,j) = r(i,j) + h;
             r_minus(i,j) = r(i,j) - h;
             system.SetPosition(r_minus);
-            //wfminus = system.PerturbedWavefunction();
             wfminus = system.SixElectronSystem();
             system.SetPosition(r_plus);
-            //wfplus = system.PerturbedWavefunction();
             wfplus = system.SixElectronSystem();
             qforce(i,j) = (wfplus - wfminus)/(wf*h);
             r_plus(i,j) = r(i,j);
@@ -311,10 +307,8 @@ double local_energy(mat r, double alpha, double beta, double wfold,\
       r_minus(i,j) = r(i,j) - h;
 
       system.SetPosition(r_minus);
-      //wfminus = system.PerturbedWavefunction();
       wfminus = system.SixElectronSystem();
       system.SetPosition(r_plus);
-      //wfplus = system.PerturbedWavefunction();
       wfplus = system.SixElectronSystem();
 
       e_kinetic -= (wfminus + wfplus - 2.*wfold);
@@ -369,10 +363,8 @@ void output(int max_variations, int number_cycles, int charge, \
   ofile << setw(15) << "variance (cum_e)";
   ofile << setw(15) << "error (cum_e)" << endl;
   for(i = 1; i <= max_variations; i++){
-      alpha += astep;
       beta = bbegin;
       for (j = 1; j <= max_variations; j++){
-          beta += bstep;
           variance = cumulative_e2(i,j)-cumulative_e(i,j)*cumulative_e(i,j);
           error=sqrt(variance/number_cycles);
           ofile << setiosflags(ios::showpoint | ios::uppercase);
@@ -383,7 +375,9 @@ void output(int max_variations, int number_cycles, int charge, \
           ofile << setw(15) << setprecision(8) << pot_e(i,j);
           ofile << setw(15) << setprecision(8) << variance;
           ofile << setw(15) << setprecision(8) << error << endl;
+          beta += bstep;
       }
 
+      alpha += astep;
   }
 }

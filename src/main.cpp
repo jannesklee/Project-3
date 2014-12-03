@@ -21,8 +21,8 @@ ofstream ofile;
 // the step length and its squared inverse for the second derivative
 #define h 0.001
 #define h2 1000000
-#define abegin 0.96
-#define bbegin 0.36
+#define abegin 0.9
+#define bbegin 0.3
 #define astep 0.04
 #define bstep 0.04
 
@@ -52,7 +52,7 @@ int main()
   int thermalization = 0; 
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
-  int number_particles = 6;                   // number of particles          //
+  int number_particles = 2;                   // number of particles          //
   double step_length= 0.1;                    // either f. br.for. or imp.samp//
   mat cumulative_e, cumulative_e2;            // energy-matrices              //
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      //
@@ -125,7 +125,6 @@ void mc_sampling(int dimension, int number_particles, int charge,
   double kinetic_energy, potential_energy;
 
   D = 0.5; 
-  alpha = abegin*charge;
   idum=-1;
 
   // initial positions, initial forces
@@ -135,12 +134,11 @@ void mc_sampling(int dimension, int number_particles, int charge,
   mat qforce_new = zeros<mat>(number_particles, dimension);
   ManyBody system(dimension, number_particles, omega);
 
+  alpha = abegin*charge;
   // -------------- Loop over different values of alpha, beta --------------- //
   for (variate = 1; variate <= max_variations; variate++){
-      alpha += astep;
       beta = bbegin*charge;
       for (variate2 = 1; variate2 <= max_variations; variate2++){
-          beta += bstep;
           energy = energy2 = kinetic_energy = potential_energy = 0; 
           accept = 0; delta_e = 0;
           system.SetVariables(alpha, beta);
@@ -155,7 +153,6 @@ void mc_sampling(int dimension, int number_particles, int charge,
 
           system.SetPosition(r_old);
           wfold = system.SixElectronSystem();
-          //wfold = system.PerturbedWavefunction();
           //wfold = particle_old.UnperturbedWavefunction();
 
           i = 0; 
@@ -183,8 +180,6 @@ void mc_sampling(int dimension, int number_particles, int charge,
 
               system.SetPosition(r_new);
               wfnew = system.SixElectronSystem();
-              //wfnew = system.PerturbedWavefunction();
-              //wfnew= system.PerturbedWavefunction();
               
               quantum_force(number_particles, dimension, alpha, beta, omega,\
                       wfnew, r_new, qforce_new, i);
@@ -241,7 +236,9 @@ void mc_sampling(int dimension, int number_particles, int charge,
                << "pot. energy = " << pot_e(variate,variate2) << setw(20)
                << "thread = " << thread << endl;
           }
+          beta += bstep;
       }
+      alpha += astep;
   }    // end of loop over variational  steps
 }   // end mc_sampling function
 
@@ -266,18 +263,6 @@ void quantum_force(int number_particles, int dimension, double alpha, \
     for(k = 0; k < dimension; k++) {
         qforce(particle_ind,k) = 2.*(grad_slater(k) + grad_jastrow(k));
     }
-
-//    // closed-form two particles
-//    a = 1.0;
-//    for (i = 0; i < number_particles-1; i++) { // sum over all inspite particle itself
-//        for (j = i+1; j < number_particles; j++) {
-//            // one time through all dimensions to evaluate distance
-//            r_12 = 0;
-//            for (k = 0; k < dimension; k++) {
-//                r_12 += (r(i,k)-r(j,k))*(r(i,k)-r(j,k));
-//            }
-//            r_12 = sqrt(r_12);
-
 }
 
 void quantum_force_init(int number_particles, int dimension, double alpha, \
@@ -290,7 +275,6 @@ void quantum_force_init(int number_particles, int dimension, double alpha, \
     // Setup Slater
     Slater slater_obj(r, alpha, beta, dimension, number_particles, omega);
     slater_obj.SetupSixElectron();
-//    slater_obj.SetupTwoElectron();
 
     // Setup Jastrow
     Jastrow jastrow_obj(r, alpha, beta, dimension, number_particles, omega);
@@ -319,7 +303,6 @@ double local_energy(mat r, double alpha, double beta, double wfold,\
   (void) charge;
   (void) particle; 
   (void) wfold;
-  //ManyBody system(r_minus, alpha, beta, dimension, number_particles, omega);
 
 
   // ---------------------- kinetic energy ---------------------------------- //
@@ -328,7 +311,6 @@ double local_energy(mat r, double alpha, double beta, double wfold,\
   // Setup Slater
   Slater slater_obj(r, alpha, beta, dimension, number_particles, omega);
   slater_obj.SetupSixElectron();
-  //  slater_obj.SetupTwoElectron();
 
   // Setup Jastrow
   Jastrow jastrow_obj(r, alpha, beta, dimension, number_particles, omega);
@@ -421,10 +403,8 @@ void output(int max_variations, int number_cycles, int charge, \
   ofile << setw(15) << "variance (cum_e)";
   ofile << setw(15) << "error (cum_e)" << endl;
   for(i = 1; i <= max_variations; i++){
-      alpha += astep;
       beta = bbegin;
       for (j = 1; j <= max_variations; j++){
-          beta += bstep;
           variance = cumulative_e2(i,j)-cumulative_e(i,j)*cumulative_e(i,j);
           error=sqrt(variance/number_cycles);
           ofile << setiosflags(ios::showpoint | ios::uppercase);
@@ -435,7 +415,9 @@ void output(int max_variations, int number_cycles, int charge, \
           ofile << setw(15) << setprecision(8) << pot_e(i,j);
           ofile << setw(15) << setprecision(8) << variance;
           ofile << setw(15) << setprecision(8) << error << endl;
+          beta += bstep;
       }
 
+      alpha += astep;
   }
 }

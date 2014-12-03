@@ -22,9 +22,9 @@ class Slater
         int number_particles, double omega);
 
         void SetupSixElectron();
-        void SetupTwoElectron();
         void SetPosition(mat r); 
-        mat Gradient(int i);
+        vec Gradient(int i);
+        double Laplacian(int i);
         void InitInverseSlaterMatrices();
         void UpdateInverseSlaterMatrices();
 };

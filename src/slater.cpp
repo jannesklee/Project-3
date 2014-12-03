@@ -31,23 +31,6 @@ void Slater::SetPosition(mat r) {
     m_r = r; 
 }
 
-// ------------------------ functions --------------------------------------- //
-void Slater::SetupTwoElectron(){
-    SingleParticle particle[2];
-
-    particle[0].SetAll(conv_to<vec>::from(m_r.row(0)), 0, 0, m_dimension,\
-            m_omega, m_alpha);
-    particle[1].SetAll(conv_to<vec>::from(m_r.row(1)), 0, 0, m_dimension,\
-            m_omega, m_alpha);
-
-    // spin up
-    particle[0].SetPosition(conv_to<vec>::from(m_r.row(0))); 
-    m_slater_up(0,0) = particle[0].Wavefunction();
-    // spin down
-    particle[1].SetPosition(conv_to<vec>::from(m_r.row(1))); 
-    m_slater_down(0,0) = particle[1].Wavefunction();
-}
-
 void Slater::SetupSixElectron(){
     int i, j;
 
@@ -85,22 +68,55 @@ void Slater::SetupSixElectron(){
     }
 }
 
-//! \todo{make this when the rest is working}
-//void Slater::UpdateInverseSlaterMatrices() {
-//        
-//}
-
-mat Slater::Gradient(int i) {
+vec Slater::Gradient(int i) {
     int k, j, offset; 
     vec slater_grad, particle_grad;
     mat m_slater, m_slater_inv;
     SingleParticle particle[m_number_particles/2];
 
     slater_grad = vec(m_dimension);
-    //particle_grad = vec(m_dimension);
     m_slater = mat(m_number_particles/2, m_number_particles/2); 
     m_slater_inv = mat(m_number_particles/2, m_number_particles/2); 
 
+
+    if (i < m_number_particles/2) {
+        m_slater = m_slater_up;
+        offset = 0;
+    }
+    else {
+        m_slater = m_slater_down;
+        offset = m_number_particles/2; 
+    }
+
+    particle[0].SetAll(conv_to<vec>::from(m_r.row(0)), 0, 0, m_dimension,\
+            m_omega, m_alpha);
+    particle[1].SetAll(conv_to<vec>::from(m_r.row(0)), 1, 0, m_dimension,\
+            m_omega, m_alpha);
+    particle[2].SetAll(conv_to<vec>::from(m_r.row(0)), 0, 1, m_dimension,\
+            m_omega, m_alpha);
+
+    m_slater_inv = inv(m_slater);
+
+    for (k = 0; k < m_number_particles/2; k++) {
+        particle[k].SetPosition(conv_to<vec>::from(m_r.row(i)));
+        particle_grad = particle[k].GetGradient();
+
+        for (j = 0; j < m_dimension; j++) {
+            slater_grad(j) += particle_grad(j)*m_slater_inv(k,i-offset);    
+        }
+    }    
+
+    return slater_grad; 
+}
+
+double Slater::Laplacian(int i) {
+    int k, offset; 
+    double slater_lap, particle_lap;
+    mat m_slater, m_slater_inv;
+    SingleParticle particle[m_number_particles/2];
+
+    m_slater = mat(m_number_particles/2, m_number_particles/2); 
+    m_slater_inv = mat(m_number_particles/2, m_number_particles/2); 
 
     if (i < m_number_particles/2) {
         m_slater = m_slater_up;
@@ -120,15 +136,13 @@ mat Slater::Gradient(int i) {
 
     m_slater_inv = inv(m_slater);
 
+    slater_lap = 0;
     for (k = 0; k < m_number_particles/2; k++) {
         particle[k].SetPosition(conv_to<vec>::from(m_r.row(i)));
-        particle_grad = particle[k].GetGradient();
-
-        for (j = 0; j < m_dimension; j++) {
-            slater_grad(j) = particle_grad(j)*m_slater_inv(k,i-offset);
-        }
+        particle_lap = particle[k].GetLaplacian();
+        slater_lap += particle_lap*m_slater_inv(k,i-offset);
     }    
 
-    return slater_grad; 
+    return slater_lap;
 }
 

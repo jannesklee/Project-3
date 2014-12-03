@@ -49,7 +49,7 @@ int main()
 {
   int number_cycles = 100000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
-  int thermalization = 0; 
+  int thermalization = 10000; 
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 6;                   // number of particles          //
@@ -161,6 +161,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
           i = 0; 
           quantum_force_init(number_particles, dimension, alpha, beta, omega, \
                   wfold, r_old, qforce_old);
+//          qforce_old.zeros();
 
           // -------------- loop over monte carlo cycles -------------------- //
           for (cycles = 1; cycles <= number_cycles + thermalization; cycles++){
@@ -171,6 +172,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
                 r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*sqrt(step_length)
                            + step_length*D*qforce_old(i,j);
               }
+//            }
               
               // we move only one particle at the time
               for (k = 0; k < number_particles; k++) {
@@ -187,24 +189,35 @@ void mc_sampling(int dimension, int number_particles, int charge,
               //wfnew= system.PerturbedWavefunction();
               
               quantum_force(number_particles, dimension, alpha, beta, omega,\
+<<<<<<< HEAD
                       wfnew, r_new, qforce_new, i);
+||||||| merged common ancestors
+                      wfnew, r_new, qforce_new);
+=======
+                      wfnew, r_new, qforce_new);
+//              qforce_new.zeros();
+>>>>>>> master
               
               // ------------------ greensfunction ---------------------------- //
               greensfunction = 0.0;
+//            for (i = 0; i < number_particles; i++){
               for (j = 0; j < dimension; j++) {
                   greensfunction += 0.5*(qforce_old(i,j) + qforce_new(i,j))* \
                      (D*step_length*0.5*(qforce_old(i,j) - qforce_new(i,j))- \
                       r_new(i,j) + r_old(i,j));
               }
+//              }
               greensfunction = exp(greensfunction);
 
 //              greensfunction = 1.;
               // ----------------- metropolis test ---------------------------- //
               if (ran2(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
+//                  for (i = 0; i < number_particles; i++) {
                   for (j = 0; j < dimension; j++){
                       r_old(i,j) = r_new(i,j);
                       qforce_old(i,j) = qforce_new(i,j); 
                   }
+//                  }
               wfold = wfnew;
               accept = accept + 1;
               }
@@ -257,6 +270,7 @@ void quantum_force(int number_particles, int dimension, double alpha, \
     // Setup Slater Determinant
     Slater slater_obj(r, alpha, beta, dimension, number_particles, omega);
     slater_obj.SetupSixElectron();
+//    slater_obj.SetupTwoElectron();
     grad_slater = slater_obj.Gradient(particle_ind); 
 
     // Setup Jastrow
@@ -291,7 +305,7 @@ void quantum_force_init(int number_particles, int dimension, double alpha, \
     Slater slater_obj(r, alpha, beta, dimension, number_particles, omega);
     slater_obj.SetupSixElectron();
 //    slater_obj.SetupTwoElectron();
-
+//
     // Setup Jastrow
     Jastrow jastrow_obj(r, alpha, beta, dimension, number_particles, omega);
 
@@ -303,6 +317,38 @@ void quantum_force_init(int number_particles, int dimension, double alpha, \
             qforce(particle_ind,k) = 2.*(grad_slater(k) + grad_jastrow(k));
         }
     }
+
+
+//    int i, j;
+//    double wfminus , wfplus;
+//    mat r_plus, r_minus;
+//
+//    r_plus = zeros<mat>(number_particles,dimension);
+//    r_minus = zeros<mat>(number_particles,dimension);
+//    ManyBody system(alpha, beta, dimension, number_particles, omega);
+//
+//    for(i = 0 ; i < number_particles; i++) {
+//        for (j = 0; j < dimension ; j++) {
+//            r_plus(i,j) = r_minus(i,j) = r(i,j);
+//        }
+//    }
+//
+//    // quantum the first derivative
+//    for (i = 0; i < number_particles; i++){
+//        for (j = 0; j < dimension; j++){
+//            r_plus(i,j) = r(i,j) + h;
+//            r_minus(i,j) = r(i,j) - h;
+//            system.SetPosition(r_minus);
+//            //wfminus = system.PerturbedWavefunction();
+//            wfminus = system.SixElectronSystem();
+//            system.SetPosition(r_plus);
+//            //wfplus = system.PerturbedWavefunction();
+//            wfplus = system.SixElectronSystem();
+//            qforce(i,j) = (wfplus - wfminus)/(wf*h);
+//            r_plus(i,j) = r(i,j);
+//            r_minus(i,j) = r(i,j);
+//        }
+//    }
 }
 
 /* -------------------------------------------------------------------------- *
@@ -314,68 +360,44 @@ double local_energy(mat r, double alpha, double beta, double wfold,\
 {
   int i, j , k;
   double e_local, e_kinetic, e_potential, r_12, r_single_particle;
-  vec grad_slater, grad_jastrow;
-  double lap_slater, lap_jastrow;
+  double wfminus, wfplus;
   (void) charge;
   (void) particle; 
-  (void) wfold;
-  //ManyBody system(r_minus, alpha, beta, dimension, number_particles, omega);
+  mat r_plus,r_minus;
+  ManyBody system(r_minus, alpha, beta, dimension, number_particles, omega);
 
-
-  // ---------------------- kinetic energy ---------------------------------- //
-  // closed-form solution 
-   
-  // Setup Slater
-  Slater slater_obj(r, alpha, beta, dimension, number_particles, omega);
-  slater_obj.SetupSixElectron();
-  //  slater_obj.SetupTwoElectron();
-
-  // Setup Jastrow
-  Jastrow jastrow_obj(r, alpha, beta, dimension, number_particles, omega);
-
-
-  e_kinetic = 0.0;
+  // allocate matrices which contain the position of the particles
+  // the function matrix is defined in the progam library
+  r_plus = zeros<mat>(number_particles,dimension);
+  r_minus = zeros<mat>(number_particles,dimension);
   for (i = 0; i < number_particles; i++) {
-      grad_slater = slater_obj.Gradient(i); 
-      lap_slater = slater_obj.Laplacian(i);
-      grad_jastrow = jastrow_obj.Gradient(i); // gradient has to be calculated befor laplacian
-      lap_jastrow = jastrow_obj.Laplacian(i);
-
-      e_kinetic += -0.5*(lap_slater + lap_jastrow + 2*dot(grad_slater,grad_jastrow));
+    for (j = 0; j < dimension; j++) {
+      r_plus(i,j) = r_minus(i,j) = r(i,j);
+    }
   }
 
+  // ---------------------- kinetic energy ---------------------------------- //
+  // brute force derivation
+  e_kinetic = 0;
+  for (i = 0; i < number_particles; i++) {
+    for (j = 0; j < dimension; j++) {
+      r_plus(i,j) = r(i,j) + h;
+      r_minus(i,j) = r(i,j) - h;
 
-//  // allocate matrices which contain the position of the particles
-//  // the function matrix is defined in the progam library
-//  r_plus = zeros<mat>(number_particles,dimension);
-//  r_minus = zeros<mat>(number_particles,dimension);
-//  for (i = 0; i < number_particles; i++) {
-//    for (j = 0; j < dimension; j++) {
-//      r_plus(i,j) = r_minus(i,j) = r(i,j);
-//    }
-//  }
+      system.SetPosition(r_minus);
+      //wfminus = system.PerturbedWavefunction();
+      wfminus = system.SixElectronSystem();
+      system.SetPosition(r_plus);
+      //wfplus = system.PerturbedWavefunction();
+      wfplus = system.SixElectronSystem();
 
-//  // brute force derivation
-//  e_kinetic = 0;
-//  for (i = 0; i < number_particles; i++) {
-//    for (j = 0; j < dimension; j++) {
-//      r_plus(i,j) = r(i,j) + h;
-//      r_minus(i,j) = r(i,j) - h;
-//
-//      system.SetPosition(r_minus);
-//      //wfminus = system.PerturbedWavefunction();
-//      wfminus = system.SixElectronSystem();
-//      system.SetPosition(r_plus);
-//      //wfplus = system.PerturbedWavefunction();
-//      wfplus = system.SixElectronSystem();
-//
-//      e_kinetic -= (wfminus + wfplus - 2.*wfold);
-//      r_plus(i,j) = r(i,j);
-//      r_minus(i,j) = r(i,j);
-//    }
-//  }
-//  // include electron mass and hbar squared and divide by wave function
-//  e_kinetic = 0.5*h2*e_kinetic/wfold;
+      e_kinetic -= (wfminus + wfplus - 2.*wfold);
+      r_plus(i,j) = r(i,j);
+      r_minus(i,j) = r(i,j);
+    }
+  }
+  // include electron mass and hbar squared and divide by wave function
+  e_kinetic = 0.5*h2*e_kinetic/wfold;
 
   // ---------------------- potential energy -------------------------------- //
   e_potential = 0;

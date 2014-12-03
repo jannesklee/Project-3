@@ -1,6 +1,7 @@
 #include <iomanip>
 #include <armadillo>
 #include "singleparticle.h"
+#include "jastrow.h"
 #include "manybody.h"
 #include <omp.h>
 

@@ -22,13 +22,13 @@ class Jastrow
         int number_particles, double omega);
 
         // calculates derivatives
-        void UpdateDerivatives();
         vec Gradient(int);
-        double Laplacian();
+        double Laplacian(int);
+        double Factor(); 
 
         // getters, setters
         vec GetGradient();
-        double GetLaplacianSum();
+        double GetLaplacian();
 };
 
 #endif // JASTROW_H

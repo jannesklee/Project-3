@@ -42,7 +42,7 @@ void quantum_force(int, int, double, double, double, double, mat, mat &);
  * -------------------------------------------------------------------------- */
 int main()
 {
-  int number_cycles = 100000;                 // number of Monte-Carlo steps  //
+  int number_cycles = 50000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
@@ -63,7 +63,7 @@ int main()
 
   // ----------------------- MC sampling ------------------------------------ //
 //omp_set_num_threads(1);
-#pragma omp parallel //shared(cumulative_e_temp, cumulative_e2_temp)
+#pragma omp parallel shared(cumulative_e_temp, cumulative_e2_temp)
   {
   cumulative_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
   cumulative_e2_temp = mat(max_variations+1, max_variations+1, fill::zeros);
@@ -154,13 +154,14 @@ void mc_sampling(int dimension, int number_particles, int charge,
 
           quantum_force(number_particles, dimension, alpha, beta, omega, \
                   wfold, r_old, qforce_old);
+//          qforce_old.zeros();
 
           // -------------- loop over monte carlo cycles -------------------- //
           for (cycles = 1; cycles <= number_cycles; cycles++){
             // new position
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
-//                r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
+//              r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
                 r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*sqrt(step_length)
                            + step_length*D*qforce_old(i,j);
               }
@@ -182,6 +183,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
               
               quantum_force(number_particles, dimension, alpha, beta, omega,\
                       wfnew, r_new, qforce_new);
+//              qforce_new.zeros();
               
               // ------------------ greensfunction ---------------------------- //
               greensfunction = 0.0;
@@ -206,11 +208,6 @@ void mc_sampling(int dimension, int number_particles, int charge,
               wfold = wfnew;
               accept = accept + 1;
               }
-//              else {
-//                  cout << r_old << endl; 
-//                  cout << omp_get_thread_num()<< setw(14)<< greensfunction*wfnew*wfnew/wfold/wfold << setw(14) <<
-//                    greensfunction << setw(14) << wfnew << setw(14) << wfold <<  endl;
-//              }
             }
 
             // ----------------- local energy ------------------------------- //

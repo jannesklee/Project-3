@@ -89,7 +89,7 @@ double ManyBody::SixElectronSystem()
                 r_12 += (m_r(i,k)-m_r(j,k))*(m_r(i,k)-m_r(j,k));
             }
                 // evaluate a for parallel or antiparallel spin
-                if ((i+j)%2 == 0) { 
+                if ((i < 3 && j < 3) or (j > 2 && i > 2)) { 
                     a = 1./3.;
                 }
                 else {
@@ -105,14 +105,14 @@ double ManyBody::SixElectronSystem()
     // spin-up particles
     particle[0].SetAll(conv_to<vec>::from(m_r.row(0)), 0, 0, m_dimension,\
             m_omega, m_alpha);
-    particle[2].SetAll(conv_to<vec>::from(m_r.row(0)), 1, 0, m_dimension,\
+    particle[1].SetAll(conv_to<vec>::from(m_r.row(0)), 1, 0, m_dimension,\
             m_omega, m_alpha);
-    particle[4].SetAll(conv_to<vec>::from(m_r.row(0)), 0, 1, m_dimension,\
+    particle[2].SetAll(conv_to<vec>::from(m_r.row(0)), 0, 1, m_dimension,\
             m_omega, m_alpha);
     // spin-down particles
-    particle[1].SetAll(conv_to<vec>::from(m_r.row(m_number_particles/2)), 0, 0, m_dimension,\
+    particle[3].SetAll(conv_to<vec>::from(m_r.row(m_number_particles/2)), 0, 0, m_dimension,\
             m_omega, m_alpha);
-    particle[3].SetAll(conv_to<vec>::from(m_r.row(m_number_particles/2)), 1, 0, m_dimension,\
+    particle[4].SetAll(conv_to<vec>::from(m_r.row(m_number_particles/2)), 1, 0, m_dimension,\
             m_omega, m_alpha);
     particle[5].SetAll(conv_to<vec>::from(m_r.row(m_number_particles/2)), 0, 1, m_dimension,\
             m_omega, m_alpha);
@@ -121,11 +121,11 @@ double ManyBody::SixElectronSystem()
     for (i = 0; i < red_slater_size; i++) {
         for (j = 0; j < red_slater_size; j++) {
             // spin up
-            particle[i*2].SetPosition(conv_to<vec>::from(m_r.row(j))); 
-            slater_up(i,j) = particle[i*2].Wavefunction();
+            particle[i].SetPosition(conv_to<vec>::from(m_r.row(j))); 
+            slater_up(i,j) = particle[i].Wavefunction();
             // spin down
-            particle[i*2+1].SetPosition(conv_to<vec>::from(m_r.row(j+m_number_particles/2))); 
-            slater_down(i,j) = particle[i*2+1].Wavefunction();
+            particle[i+m_number_particles/2].SetPosition(conv_to<vec>::from(m_r.row(j+m_number_particles/2))); 
+            slater_down(i,j) = particle[i+m_number_particles/2].Wavefunction();
         }
     }
 

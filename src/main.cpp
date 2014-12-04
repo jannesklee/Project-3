@@ -20,7 +20,7 @@ ofstream ofile;
 #define h 0.001
 #define h2 1000000
 #define abegin 1.0
-#define bbegin 0.5
+#define bbegin 0.4
 #define astep 0.04
 #define bstep 0.04
 
@@ -47,7 +47,7 @@ int main()
   int max_variations = 5;                     // max. var. params             //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
-  int number_particles = 2;                   // number of particles          //
+  int number_particles = 6;                   // number of particles          //
   double step_length= 0.1;                    // either f. br.for. or imp.samp//
   mat cumulative_e, cumulative_e2;            // energy-matrices              //
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      //
@@ -318,7 +318,7 @@ double local_energy(mat r, double alpha, double beta, double wfold,\
       system.SetPosition(r_plus);
       wfplus = system.SixElectronSystem();
 
-      e_kinetic -= (wfminus + wfplus - 2.*wfold);
+      e_kinetic += -(wfminus + wfplus - 2.*wfold);
       r_plus(i,j) = r(i,j);
       r_minus(i,j) = r(i,j);
     }
@@ -336,6 +336,7 @@ double local_energy(mat r, double alpha, double beta, double wfold,\
     }
     e_potential += 0.5*omega*omega*r_single_particle;
   }
+
   // contribution from electron-electron potential
   for (i = 0; i < number_particles-1; i++) {
     for (j = i+1; j < number_particles; j++) {

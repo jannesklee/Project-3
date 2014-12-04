@@ -43,7 +43,7 @@ void quantum_force(int, int, double, double, double, double, mat, mat &);
  * -------------------------------------------------------------------------- */
 int main()
 {
-  int number_cycles = 100000;                 // number of Monte-Carlo steps  //
+  int number_cycles = 400000;                 // number of Monte-Carlo steps  //
   int max_variations = 5;                     // max. var. params             //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
@@ -154,11 +154,9 @@ void mc_sampling(int dimension, int number_particles, int charge,
 
           system.SetPosition(r_old);
           wfold = system.SixElectronSystem();
-          //wfold = particle_old.UnperturbedWavefunction();
 
           quantum_force(number_particles, dimension, alpha, beta, omega, \
                   wfold, r_old, qforce_old);
-//          qforce_old.zeros();
 
           // -------------- loop over monte carlo cycles -------------------- //
           for (cycles = 1; cycles <= number_cycles; cycles++){
@@ -169,7 +167,6 @@ void mc_sampling(int dimension, int number_particles, int charge,
                 r_new(i,j) = r_old(i,j) + randoms[omp_get_thread_num()]->nextGauss()*sqrt(step_length)
                            + step_length*D*qforce_old(i,j);
               }
-//            }
               
               // we move only one particle at the time
               for (k = 0; k < number_particles; k++) {
@@ -182,32 +179,26 @@ void mc_sampling(int dimension, int number_particles, int charge,
 
               system.SetPosition(r_new);
               wfnew = system.SixElectronSystem();
-              //wfnew= particle_new.UnperturbedWavefunction();
               
               quantum_force(number_particles, dimension, alpha, beta, omega,\
                       wfnew, r_new, qforce_new);
-//              qforce_new.zeros();
               
               // ------------------ greensfunction ---------------------------- //
               greensfunction = 0.0;
-//            for (i = 0; i < number_particles; i++){
               for (j = 0; j < dimension; j++) {
                   greensfunction += 0.5*(qforce_old(i,j) + qforce_new(i,j))* \
                      (D*step_length*0.5*(qforce_old(i,j) - qforce_new(i,j))- \
                       r_new(i,j) + r_old(i,j));
               }
-//              }
               greensfunction = exp(greensfunction);
 
 //              greensfunction = 1.;
               // ----------------- metropolis test ---------------------------- //
               if (randoms[omp_get_thread_num()]->nextDouble() <= greensfunction*wfnew*wfnew/wfold/wfold){
-//                  for (i = 0; i < number_particles; i++) {
                   for (j = 0; j < dimension; j++){
                       r_old(i,j) = r_new(i,j);
                       qforce_old(i,j) = qforce_new(i,j); 
                   }
-//                  }
               wfold = wfnew;
               accept = accept + 1;
               }
@@ -318,7 +309,7 @@ double local_energy(mat r, double alpha, double beta, double wfold,\
       system.SetPosition(r_plus);
       wfplus = system.SixElectronSystem();
 
-      e_kinetic += -(wfminus + wfplus - 2.*wfold);
+      e_kinetic -= (wfminus + wfplus - 2.*wfold);
       r_plus(i,j) = r(i,j);
       r_minus(i,j) = r(i,j);
     }
@@ -344,7 +335,7 @@ double local_energy(mat r, double alpha, double beta, double wfold,\
       for (k = 0; k < dimension; k++) {
         r_12 += (r(i,k)-r(j,k))*(r(i,k)-r(j,k));
       }
-      e_potential += 1/sqrt(r_12);
+      e_potential += 1./sqrt(r_12);
     }
   }
 

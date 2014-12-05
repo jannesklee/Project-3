@@ -19,8 +19,8 @@ ofstream ofile;
 // the step length and its squared inverse for the second derivative
 #define h 0.001
 #define h2 1000000
-#define abegin 1.0
-#define bbegin 0.4
+#define abegin 0.8
+#define bbegin 0.2
 #define astep 0.04
 #define bstep 0.04
 
@@ -43,12 +43,12 @@ void quantum_force(int, int, double, double, double, double, mat, mat &);
  * -------------------------------------------------------------------------- */
 int main()
 {
-  int number_cycles = 400000;                 // number of Monte-Carlo steps  //
-  int max_variations = 5;                     // max. var. params             //
+  int number_cycles = 100000;                 // number of Monte-Carlo steps  //
+  int max_variations = 10;                     // max. var. params             //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 6;                   // number of particles          //
-  double step_length= 0.1;                    // either f. br.for. or imp.samp//
+  double step_length= 0.5;                    // either f. br.for. or imp.samp//
   mat cumulative_e, cumulative_e2;            // energy-matrices              //
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      //
   mat kin_e, pot_e;
@@ -148,7 +148,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
           for (i = 0; i < number_particles; i++) {
             for (j = 0; j < dimension; j++) {
 //             r_old(i,j) = step_length*(ran2(&idum)-0.5);
-              r_old(i,j) = randoms[omp_get_thread_num()]->nextGauss()*sqrt(step_length);
+              r_old(i,j) = gaussian_deviate(&idum)*sqrt(step_length);
             }
           }
 
@@ -164,7 +164,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
             for (i = 0; i < number_particles; i++) {
               for (j = 0; j < dimension; j++) {
 //              r_new(i,j) = r_old(i,j) + step_length*(ran1(&idum)-0.5);
-                r_new(i,j) = r_old(i,j) + randoms[omp_get_thread_num()]->nextGauss()*sqrt(step_length)
+                r_new(i,j) = r_old(i,j) + gaussian_deviate(&idum)*sqrt(step_length)
                            + step_length*D*qforce_old(i,j);
               }
               
@@ -194,7 +194,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
 
 //              greensfunction = 1.;
               // ----------------- metropolis test ---------------------------- //
-              if (randoms[omp_get_thread_num()]->nextDouble() <= greensfunction*wfnew*wfnew/wfold/wfold){
+              if (ran2(&idum) <= greensfunction*wfnew*wfnew/wfold/wfold){
                   for (j = 0; j < dimension; j++){
                       r_old(i,j) = r_new(i,j);
                       qforce_old(i,j) = qforce_new(i,j); 

@@ -20,21 +20,21 @@ ofstream ofile;
 #define h 0.001
 #define h2 1000000
 #define abegin 0.8
-#define bbegin 0.2
-#define astep 0.04
-#define bstep 0.04
+#define bbegin 0.25
+#define astep 0.05
+#define bstep 0.012
 
 /* -------------------------------------------------------------------------- *
  *                        Declaration of functions                            *
  * -------------------------------------------------------------------------- */
 // The Mc sampling for the variational Monte Carlo
-void mc_sampling(int, int, int, int, int, double, mat &, mat &, double,\
+void mc_sampling(int, int, int, int, int, int, double, mat &, mat &, double,\
         mat &, mat &, vector<Random*> &);
 // The local energy
 double local_energy(mat, double, double, double, int, int, int, double,\
         double &, double &);
 // prints to screen the results of the calculations
-void output(int, int, int, mat, mat, mat, mat);
+void output(int, int, int, int, mat, mat, mat, mat);
 // quantum force for importance sampling
 void quantum_force(int, int, double, double, double, double, mat, mat &);
 
@@ -44,7 +44,8 @@ void quantum_force(int, int, double, double, double, double, mat, mat &);
 int main()
 {
   int number_cycles = 100000;                 // number of Monte-Carlo steps  //
-  int max_variations = 10;                     // max. var. params             //
+  int max_variations = 1;                     // max. var. params             //
+  int max_variations2 = 1;                     // for beta parameter //
   int charge = 1;                             // nucleus' charge              //
   int dimension = 2;                          // dimensionality               //
   int number_particles = 6;                   // number of particles          //
@@ -53,7 +54,7 @@ int main()
   mat cumulative_e_temp, cumulative_e2_temp;  // energy-matrix (squared)      //
   mat kin_e, pot_e;
   mat kin_e_temp, pot_e_temp;
-  double omega = 1.;                         // freq. harm. osc.             //
+  double omega = 1.00;                         // freq. harm. osc.             //
   int num_threads;                            // number of threads            //
 
   vector<Random*> randoms;
@@ -62,22 +63,22 @@ int main()
   randoms.push_back(new Random(-3));
   randoms.push_back(new Random(-4));
 
-  cumulative_e = mat(max_variations+1, max_variations+1, fill::zeros);
-  cumulative_e2 = mat(max_variations+1, max_variations+1, fill::zeros);
-  kin_e = mat(max_variations+1, max_variations+1, fill::zeros);
-  pot_e = mat(max_variations+1, max_variations+1, fill::zeros);
+  cumulative_e = mat(max_variations+1, max_variations2+1, fill::zeros);
+  cumulative_e2 = mat(max_variations+1, max_variations2+1, fill::zeros);
+  kin_e = mat(max_variations+1, max_variations2+1, fill::zeros);
+  pot_e = mat(max_variations+1, max_variations2+1, fill::zeros);
 
 
   // ----------------------- MC sampling ------------------------------------ //
 //omp_set_num_threads(1);
 #pragma omp parallel shared(cumulative_e_temp, cumulative_e2_temp)
   {
-  cumulative_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
-  cumulative_e2_temp = mat(max_variations+1, max_variations+1, fill::zeros);
-  kin_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
-  pot_e_temp = mat(max_variations+1, max_variations+1, fill::zeros);
+  cumulative_e_temp = mat(max_variations+1, max_variations2+1, fill::zeros);
+  cumulative_e2_temp = mat(max_variations+1, max_variations2+1, fill::zeros);
+  kin_e_temp = mat(max_variations+1, max_variations2+1, fill::zeros);
+  pot_e_temp = mat(max_variations+1, max_variations2+1, fill::zeros);
   mc_sampling(dimension, number_particles, charge, \
-              max_variations, number_cycles, \
+              max_variations, max_variations2, number_cycles, \
               step_length, cumulative_e_temp, cumulative_e2_temp, omega, \
               kin_e_temp, pot_e_temp, randoms);
 #pragma omp barrier
@@ -100,7 +101,7 @@ int main()
 
   // ------------------------- Output --------------------------------------- //
   ofile.open("vmc.dat");
-  output(max_variations, number_cycles, charge, cumulative_e, cumulative_e2,\
+  output(max_variations, max_variations2, number_cycles, charge, cumulative_e, cumulative_e2,\
           kin_e, pot_e);
   ofile.close();  // close output file
 
@@ -115,7 +116,7 @@ int main()
  *             Monte Carlo sampling with the Metropolis algorithm             *
  * -------------------------------------------------------------------------- */
 void mc_sampling(int dimension, int number_particles, int charge,
-                 int max_variations, int number_cycles, double step_length,
+                 int max_variations, int max_variations2, int number_cycles, double step_length,
                  mat &cumulative_e, mat &cumulative_e2, double omega,
                  mat &kin_e, mat &pot_e, vector<Random*> &randoms){
 
@@ -139,7 +140,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
   // -------------- Loop over different values of alpha, beta --------------- //
   for (variate = 1; variate <= max_variations; variate++){
       beta = bbegin*charge;
-      for (variate2 = 1; variate2 <= max_variations; variate2++){
+      for (variate2 = 1; variate2 <= max_variations2; variate2++){
           energy = energy2 = kinetic_energy = potential_energy = 0; 
           accept = 0; delta_e = 0;
           system.SetVariables(alpha, beta);
@@ -148,7 +149,7 @@ void mc_sampling(int dimension, int number_particles, int charge,
           for (i = 0; i < number_particles; i++) {
             for (j = 0; j < dimension; j++) {
 //             r_old(i,j) = step_length*(ran2(&idum)-0.5);
-              r_old(i,j) = gaussian_deviate(&idum)*sqrt(step_length);
+              r_old(i,j) = gaussian_deviate(&idum)*0.7;
             }
           }
 
@@ -335,7 +336,7 @@ double local_energy(mat r, double alpha, double beta, double wfold,\
       for (k = 0; k < dimension; k++) {
         r_12 += (r(i,k)-r(j,k))*(r(i,k)-r(j,k));
       }
-      e_potential += 1./sqrt(r_12);
+      e_potential += 0.0;//1./sqrt(r_12);
     }
   }
 
@@ -348,7 +349,7 @@ double local_energy(mat r, double alpha, double beta, double wfold,\
 
 
 // output function
-void output(int max_variations, int number_cycles, int charge, \
+void output(int max_variations, int max_variations2, int number_cycles, int charge, \
         mat cumulative_e, mat cumulative_e2, mat kin_e, mat pot_e)
 {
   int i, j;
@@ -363,7 +364,7 @@ void output(int max_variations, int number_cycles, int charge, \
   ofile << setw(15) << "error (cum_e)" << endl;
   for(i = 1; i <= max_variations; i++){
       beta = bbegin;
-      for (j = 1; j <= max_variations; j++){
+      for (j = 1; j <= max_variations2; j++){
           variance = cumulative_e2(i,j)-cumulative_e(i,j)*cumulative_e(i,j);
           error=sqrt(variance/number_cycles);
           ofile << setiosflags(ios::showpoint | ios::uppercase);

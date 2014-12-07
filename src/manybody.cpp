@@ -117,7 +117,7 @@ double ManyBody::SixElectronSystem()
 
     // ---------------------- calculate wavefunction ------------------------ //
     
-    wf = det_slater_up*det_slater_down*psi_c;
+    wf = det_slater_up*det_slater_down;//*psi_c;
     return wf;
 }
 

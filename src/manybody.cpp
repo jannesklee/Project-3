@@ -78,6 +78,7 @@ double ManyBody::SixElectronSystem()
             for (k = 0; k < m_dimension; k++) {
                 r_12 += (m_r(i,k)-m_r(j,k))*(m_r(i,k)-m_r(j,k));
             }
+            r_12 = sqrt(r_12);
                 // evaluate a for parallel or antiparallel spin
                 if ((i < n2 && j < n2) || (i >= n2 && j >= n2)) { 
                     a = 1./3.;
@@ -85,7 +86,6 @@ double ManyBody::SixElectronSystem()
                 else {
                     a = 1.;
                 }
-            r_12 = sqrt(r_12);
             psi_c += a*r_12/(1. + m_beta*r_12);
         }
     }
@@ -112,31 +112,12 @@ double ManyBody::SixElectronSystem()
         }
     }
 
-
-//    // calculate slater determinant applying sarrus' rule
-//    det_slater_up = det_slater_down = 0;
-//    for (j = 0; j < n2; j++) {
-//        det_slater_up += slater_up(0,j)*slater_up(1,(j+1)%3)*
-//                         slater_up(2,(j+2)%3);
-//        det_slater_up -= slater_up(2,j)*slater_up(1,(j+1)%3)*
-//                         slater_up(0,(j+2)%3);
-//
-//        det_slater_down += slater_down(0,j)*slater_down(1,(j+1)%3)*
-//                         slater_down(2,(j+2)%3);
-//        det_slater_down -= slater_down(2,j)*slater_down(1,(j+1)%3)*
-//                         slater_down(0,(j+2)%3);
-//    }
-    
     det_slater_up = det(slater_up);
     det_slater_down = det(slater_down);
-//#pragma omp critical
-//    {    
-//    cout << det_slater_up << setw(15) << det_slater_down << setw(15) << psi_c << endl; 
-//    }
 
     // ---------------------- calculate wavefunction ------------------------ //
     
-    wf = det_slater_up*det_slater_down*psi_c;
+    wf = det_slater_up*det_slater_down;//*psi_c;
     return wf;
 }
 
